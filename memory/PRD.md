@@ -35,6 +35,6 @@ Türkçe eFootball lig/kupa yönetim uygulaması. Final sürüm öncesi düzeltm
 - Frontend (testing agent): iteration_1 (kupa silme + admin profil) ve iteration_2 (normal kullanıcı 2 sekmeli profil, mobil taşma yok, masaüstü grid, kadro toast) — hepsi geçti.
 
 ## Backlog / Sonraki Adımlar
-- P1: Kullanıcı referans resmine göre kupa bracket görünümünde ince ayar (resim gelince).
-- P2: Bracket'te turlar arası bağlantı çizgileri (ağaç görünümü) — opsiyonel görsel zenginleştirme.
-- P2: Yayında `ADMIN_PASSWORD`'ü güçlü değerle değiştirme hatırlatması (DEPLOYMENT_RENDER.md'de not edildi).
+- ✅ (2026-06) Bracket ağaç görünümü: turlar sütun olarak + aralarında bağlantı çizgileri (Connector/BracketTree). İç kısım yatay kaydırmalı, sayfa taşmıyor (min-w-0 ile grid taşması giderildi).
+- ✅ (2026-06) Kupa özeti PNG export: takım kısaltmaları dikey kırpılması düzeltildi (truncate kaldırıldı, line-height + html2canvas onclone). Özette de bağlantı çizgili ağaç.
+- P2: Bracket'te ileride animasyonlu kazanan vurgusu / tema seçenekleri (opsiyonel).
