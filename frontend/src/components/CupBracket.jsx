@@ -44,7 +44,7 @@ function TeamLine({ t, score, win, pen, tbd }) {
   );
 }
 
-function CupMatchCard({ m, index }) {
+function CupMatchCard({ m, index, compact }) {
   const homeWin = m.winner_team_id && m.home && m.winner_team_id === m.home.id;
   const awayWin = m.winner_team_id && m.away && m.winner_team_id === m.away.id;
   const penH = m.pen_winner_team_id && m.home && m.pen_winner_team_id === m.home.id;
@@ -53,12 +53,13 @@ function CupMatchCard({ m, index }) {
   return (
     <div
       data-testid={`cup-match-${m.id}`}
-      className={`relative glass rounded-2xl px-3 py-2.5 border transition-all overflow-hidden ${
+      className={`relative glass rounded-2xl border transition-all ${compact ? "px-2.5 py-1.5" : "px-3 py-2.5"} ${
         live ? "border-neon-green/40" : m.winner_team_id ? "border-white/10" : "border-white/5"
       }`}
     >
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] font-bold tracking-wider text-zinc-500">EŞLEŞME {index + 1}</span>
+      <div className={`flex items-center justify-between ${compact ? "mb-0.5" : "mb-1.5"}`}>
+        {!compact && <span className="text-[10px] font-bold tracking-wider text-zinc-500">EŞLEŞME {index + 1}</span>}
+        {compact && <span className="text-[9px] font-bold tracking-wider text-zinc-600">#{index + 1}</span>}
         {live ? (
           <span className="text-[10px] font-bold neon-text-green animate-pulse-glow">● CANLI</span>
         ) : m.bye ? (
@@ -72,8 +73,8 @@ function CupMatchCard({ m, index }) {
       <TeamLine t={m.home} score={m.bye ? null : m.home_score} win={homeWin} pen={penH} />
       <div className="h-px bg-white/5 my-0.5" />
       {m.bye ? (
-        <div className="flex items-center gap-1.5 py-1.5 px-1 text-[11px] neon-text-green font-semibold">
-          <ChevronRight className="w-3.5 h-3.5" /> Otomatik tur atladı
+        <div className="flex items-center gap-1.5 py-1 px-1 text-[11px] neon-text-green font-semibold">
+          <ChevronRight className="w-3.5 h-3.5" /> Tur atladı
         </div>
       ) : (
         <TeamLine t={m.away} score={m.away_score} win={awayWin} pen={penA} tbd={!m.away} />
@@ -82,14 +83,75 @@ function CupMatchCard({ m, index }) {
   );
 }
 
+/* ---------- Connector lines between rounds (tree view) ---------- */
+function Connector({ count, color = "rgba(0,245,255,0.35)" }) {
+  const groups = [];
+  for (let g = 0; g * 2 < count; g++) groups.push(g);
+  const line = (extra) => ({ borderTop: `2px solid ${color}`, position: "absolute", ...extra });
+  return (
+    <>
+      {groups.map((g) => {
+        const isPair = 2 * g + 1 < count;
+        const topPct = ((2 * g) / count) * 100;
+        const hPct = ((isPair ? 2 : 1) / count) * 100;
+        return (
+          <div key={g} className="absolute left-0 right-0" style={{ top: `${topPct}%`, height: `${hPct}%` }}>
+            {isPair ? (
+              <>
+                <span style={line({ left: 0, top: "25%", width: "50%" })} />
+                <span style={line({ left: 0, top: "75%", width: "50%" })} />
+                <span style={{ borderLeft: `2px solid ${color}`, position: "absolute", left: "50%", top: "25%", height: "50%" }} />
+                <span style={line({ left: "50%", right: 0, top: "50%" })} />
+              </>
+            ) : (
+              <span style={line({ left: 0, right: 0, top: "50%" })} />
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/* ---------- Bracket tree (rounds as columns + connector lines) ---------- */
+function BracketTree({ rounds, renderMatch, lineColor, labelClass = "text-zinc-300", testid, colWidth = 184 }) {
+  if (!rounds?.length) return null;
+  const H = Math.max(2, rounds[0].matches.length) * 84;
+  return (
+    <div className="overflow-x-auto thin-scroll pb-1" data-testid={testid}>
+      <div className="flex min-w-min">
+        {rounds.map((r, ri) => (
+          <React.Fragment key={r.round}>
+            <div className="shrink-0 flex flex-col" style={{ width: colWidth }}>
+              <div className={`h-9 flex flex-col justify-center mb-1 text-center ${labelClass}`}>
+                <div className="text-[11px] font-bold tracking-wider uppercase">{r.label}</div>
+                <div className="text-[9px] opacity-70">{r.matches.length} eşleşme{r.complete ? " · Bitti" : ""}</div>
+              </div>
+              <div className="flex flex-col" style={{ height: H }}>
+                {r.matches.map((m, i) => (
+                  <div key={m.id} className="flex-1 flex items-center px-1">
+                    <div className="w-full">{renderMatch(m, i)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {ri < rounds.length - 1 && (
+              <div className="shrink-0 flex flex-col" style={{ width: 22 }}>
+                <div className="h-9 mb-1" />
+                <div className="relative" style={{ height: H }}>
+                  <Connector count={r.matches.length} color={lineColor} />
+                </div>
+              </div>
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function CupBracket({ bracket, onOpenSummary }) {
   const rounds = bracket?.rounds || [];
-  const [active, setActive] = useState(0);
-
-  useEffect(() => {
-    // default to the latest round (the one currently being played)
-    if (rounds.length) setActive(rounds.length - 1);
-  }, [rounds.length]);
 
   if (rounds.length === 0) {
     return (
@@ -101,7 +163,7 @@ export function CupBracket({ bracket, onOpenSummary }) {
     );
   }
 
-  const current = rounds[active] || rounds[rounds.length - 1];
+  const current = rounds[rounds.length - 1];
   const champion = bracket?.champion;
 
   return (
@@ -124,32 +186,12 @@ export function CupBracket({ bracket, onOpenSummary }) {
         </div>
       )}
 
-      {/* Round tabs */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1" data-testid="cup-round-tabs">
-        {rounds.map((r, i) => (
-          <button
-            key={r.round}
-            onClick={() => setActive(i)}
-            data-testid={`cup-round-tab-${r.round}`}
-            className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-1.5 ${
-              i === active ? "btn-primary" : "glass text-zinc-300 hover:text-white"
-            }`}
-          >
-            {r.label}
-            {r.complete && <Check className="w-3.5 h-3.5" />}
-          </button>
-        ))}
-      </div>
-
-      <div className="text-xs text-zinc-500 flex items-center justify-between">
-        <span>{current.label} · {current.matches.length} eşleşme</span>
-        <span>{current.complete ? "Tamamlandı" : "Devam ediyor"}</span>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {current.matches.map((m, i) => (
-          <CupMatchCard key={m.id} m={m} index={i} />
-        ))}
+      <div className="glass rounded-3xl p-3 sm:p-4">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <span className="text-xs font-bold text-zinc-300 tracking-wide">EŞLEŞME AĞACI</span>
+          <span className="text-[10px] text-zinc-500">{current.complete ? "Güncel tur tamamlandı" : "Yana kaydırarak tüm turları görün →"}</span>
+        </div>
+        <BracketTree rounds={rounds} lineColor="rgba(0,245,255,0.35)" labelClass="text-neon-blue" testid="cup-tree" renderMatch={(m, i) => <CupMatchCard m={m} index={i} compact />} />
       </div>
     </div>
   );
@@ -172,7 +214,18 @@ export function CupSummaryModal({ open, onClose }) {
     if (!ref.current) return;
     setBusy(true);
     try {
-      const canvas = await html2canvas(ref.current, { backgroundColor: "#0a1033", scale: 2, useCORS: true });
+      const canvas = await html2canvas(ref.current, {
+        backgroundColor: "#0a1033",
+        scale: 2,
+        useCORS: true,
+        onclone: (doc) => {
+          const el = doc.querySelector('[data-testid="cup-summary-card"]');
+          if (el) {
+            el.style.lineHeight = "1.6";
+            el.querySelectorAll("span").forEach((s) => { s.style.lineHeight = "1.6"; s.style.paddingBottom = "1px"; });
+          }
+        },
+      });
       const link = document.createElement("a");
       link.download = `kupa-ozeti-${(data?.tournament?.name || "turnuva").replace(/\s+/g, "-")}.png`;
       link.href = canvas.toDataURL("image/png");
@@ -221,36 +274,36 @@ export function CupSummaryModal({ open, onClose }) {
               </div>
             )}
 
-            {/* Bracket tree (columns) */}
-            <div className="overflow-x-auto thin-scroll">
-              <div className="flex gap-4 min-w-min">
-                {data.rounds.map((r) => (
-                  <div key={r.round} className="shrink-0 w-48">
-                    <div className="text-[11px] uppercase tracking-wide text-blue-200 mb-2 font-bold">{r.label}</div>
-                    <div className="space-y-2">
-                      {r.matches.map((m) => {
-                        const homeWin = m.winner_team_id && m.home && m.winner_team_id === m.home.id;
-                        const awayWin = m.winner_team_id && m.away && m.winner_team_id === m.away.id;
-                        return (
-                          <div key={m.id} className="rounded-xl px-2.5 py-1.5 text-xs" style={{ background: "rgba(255,255,255,0.06)" }}>
-                            <div className={`flex items-center justify-between gap-1 ${homeWin ? "text-neon-green font-bold" : "text-blue-100"}`}>
-                              <span className="truncate">{m.home?.abbreviation || "?"}</span>
-                              <span>{m.bye ? "BAY" : m.home_score}</span>
-                            </div>
-                            {!m.bye && (
-                              <div className={`flex items-center justify-between gap-1 ${awayWin ? "text-neon-green font-bold" : "text-blue-100"}`}>
-                                <span className="truncate">{m.away?.abbreviation || "?"}</span>
-                                <span>{m.away_score}</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+            {/* Bracket tree (columns + connector lines) */}
+            <BracketTree
+              rounds={data.rounds}
+              lineColor="rgba(147,197,253,0.55)"
+              labelClass="text-blue-200"
+              testid="cup-summary-tree"
+              colWidth={172}
+              renderMatch={(m) => {
+                const homeWin = m.winner_team_id && m.home && m.winner_team_id === m.home.id;
+                const awayWin = m.winner_team_id && m.away && m.winner_team_id === m.away.id;
+                const row = (abbr, score, win, isBye) => (
+                  <div className="flex items-center justify-between gap-2" style={{ lineHeight: 1.7, minHeight: 24 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: win ? "#22e07a" : "#dbeafe", whiteSpace: "nowrap" }}>{abbr || "?"}</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: win ? "#22e07a" : "#dbeafe" }}>{isBye ? "BAY" : (score == null ? "–" : score)}</span>
                   </div>
-                ))}
-              </div>
-            </div>
+                );
+                return (
+                  <div className="rounded-xl px-3 py-2" style={{ background: "rgba(255,255,255,0.08)" }}>
+                    {row(m.home?.abbreviation, m.bye ? null : m.home_score, homeWin, false)}
+                    {!m.bye && (
+                      <>
+                        <div style={{ height: 1, background: "rgba(255,255,255,0.12)", margin: "2px 0" }} />
+                        {row(m.away?.abbreviation, m.away_score, awayWin, false)}
+                      </>
+                    )}
+                    {m.bye && row(null, "BAY", false, true)}
+                  </div>
+                );
+              }}
+            />
           </div>
         )}
       </DialogContent>

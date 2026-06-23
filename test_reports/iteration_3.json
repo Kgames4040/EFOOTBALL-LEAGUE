@@ -1,0 +1,35 @@
+{
+  "summary": "Frontend-only verification of (A) new connector-tree cup bracket on dashboard and (B) PNG-export abbreviation clipping fix. 3 of 4 review items PASS; ONE regression found — page horizontally overflows at 390px viewport on admin dashboard with the completed 8-team cup tree (scrollWidth=638, clientWidth=390). The tree itself is correctly inside its own overflow-x-auto scroller, but its parent (cup-bracket / lg:col-span-2 grid track) is missing min-w-0 so the column itself stretches to the intrinsic width of the tree, pushing the whole PAGE to 638px wide.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "CupBracket + Dashboard grid column",
+        "issue": "PAGE horizontal overflow at 390px viewport: document.documentElement.scrollWidth=638 vs clientWidth=390 (delta=248px). The .glass.rounded-3xl.p-3.sm:p-4 wrapper around BracketTree (and the lg:col-span-2 grid track that holds [data-testid=cup-bracket]) lack min-w-0, so CSS-grid's default min-width:auto lets the column expand to the BracketTree intrinsic width (~596px). The inner overflow-x-auto on data-testid=cup-tree therefore never engages — the page itself scrolls horizontally instead. Even the cup-champion-banner is rendered 622px wide on a 390px screen.",
+        "selector": "[data-testid=cup-bracket] > div.glass.rounded-3xl.p-3.sm:p-4  AND  the Dashboard grid column wrapping <CupBracket /> (.lg:col-span-2)",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Add `min-w-0` to the dashboard grid column wrapping <CupBracket /> (the `.lg:col-span-2` div) AND/OR to the inner `.glass.rounded-3xl.p-3 sm:p-4` wrapper in CupBracket.jsx (line 189). Without it, CSS-grid items default to min-width:auto and expand to the intrinsic size of the bracket tree, so the inner `overflow-x-auto` on data-testid=cup-tree never clips. Expected after fix: at 390px, documentElement.scrollWidth==clientWidth==390 AND the [data-testid=cup-tree] container scrolls horizontally inside the card.",
+    "Optional a11y: add <DialogTitle> (or VisuallyHidden DialogTitle) to CupSummaryModal — Radix logs a console error: 'DialogContent requires a DialogTitle for the component to be accessible for screen reader users.' Same likely applies to ConfirmDialog / other Dialogs."
+  ],
+  "critical_code_review_comments": [
+    "CupBracket.jsx BracketTree wrapper uses `overflow-x-auto` correctly but its grid ancestor needs `min-w-0` — classic CSS-grid overflow gotcha. Recommend wrapping the BracketTree in `<div className='min-w-0'>` or adding `min-w-0` to the parent column.",
+    "CupBracket.jsx line 230: filename uses raw tournament name with Turkish chars and spaces — replace /\\s+/g works, but a non-ASCII char like 'ı' is preserved (filename came out 'kupa-ozeti-Neon-Kupası.png'). Some Windows browsers may mojibake this; consider also normalising to ASCII slug.",
+    "CupSummaryModal: Radix console error about missing DialogTitle reproduced consistently (twice in this run). Low-priority a11y debt.",
+    "Connector lines use absolute-positioned spans on top of column — visually correct in screenshots, 12 connector spans rendered between 3 rounds. Good."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "75% (3/4 review items)"},
+  "test_credentials": "Admin neco/neco404 confirmed working.",
+  "seed_data_creation": "None. Used existing seeded completed cup 'Neon Kupası' (8 teams; champion Sahinler/SAH; abbreviations SAH, NEC, BOG, YLD, AS2, KUR, KRT, ASL all present and full-visible in summary).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "PASS — connector-tree bracket: cup-tree present, old cup-round-tabs removed, 7 cup-match-* cards rendered across 3 columns labelled 'Çeyrek Final / Yarı Final / Final' with 12 connector line spans between rounds and 7 neon-green winner highlights. cup-champion-banner shows 'Sahinler'. PASS — PNG summary: cup-summary-modal opens, cup-summary-tree contains ALL 8 expected abbreviations (SAH, BOG, AS2, KRT, KUR, ASL, NEC, YLD) each rendered at fontSize=14px / line-height=23.8px (~1.7) / height=24px — ZERO clipped abbreviations. PNG download triggered successfully (filename: 'kupa-ozeti-Neon-Kupası.png'). PASS — 1440px: page scrollWidth==clientWidth==1440 (no overflow). FAIL — 390px: page scrollWidth=638 vs clientWidth=390. Largest culprit element: div.lg:col-span-2 (width 622px) which contains data-testid=cup-bracket; the inner overflow-x-auto on data-testid=cup-tree is bypassed because its grid-track ancestor lacks min-w-0. Even the cup-champion-banner overflows (width 622px). Regression test for delete-tournament was NOT exercised so the cup is preserved. Recommended fix is purely CSS: add `min-w-0` to the dashboard grid column or to the `.glass.rounded-3xl.p-3.sm:p-4` inside CupBracket.",
+  "rca of the issue": "Root cause of the 390px overflow: CSS-grid columns default to `min-width: auto`, which sizes them to the intrinsic content size of their children when not explicitly overridden. The dashboard places <CupBracket/> inside a `.lg:col-span-2` track. CupBracket's BracketTree uses `<div className='overflow-x-auto'><div className='flex min-w-min'>...columns...</div></div>` — the inner flex container has min-w-min so its intrinsic width is the sum of the column widths (3 rounds × 184px + 2 connectors × 22px = ~596px). Because the grid track does not have `min-w-0`, it grows to ~596–622px, dragging the whole page wider than the 390px viewport. The overflow-x-auto then has nothing to clip because its parent already accommodates the full width. Reproduction: login as neco/neco404 at 390×844 → admin dashboard → measure `document.documentElement.scrollWidth` → 638. Mitigation: add Tailwind class `min-w-0` to the Dashboard column wrapping CupBracket (and/or to the `.glass.rounded-3xl.p-3 sm:p-4` wrapper in CupBracket.jsx around the BracketTree). After fix, the tree itself will scroll horizontally inside its card while the page stays at 390px, matching the review-request acceptance criterion."
+}
