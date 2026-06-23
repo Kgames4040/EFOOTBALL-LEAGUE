@@ -113,7 +113,7 @@ export default function Dashboard() {
         {Hero}
         {PausedBanner}
         <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 min-w-0">
             <CupBracket bracket={bracket} onOpenSummary={() => setSummaryOpen(true)} />
           </div>
           <div className="space-y-6">

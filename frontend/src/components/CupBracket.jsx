@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import api from "../lib/api";
-import { Dialog, DialogContent } from "./ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Trophy, Crown, Download, Loader2, ChevronRight, Check, ShieldHalf } from "lucide-react";
 
 function Logo({ t, size = 24 }) {
@@ -167,7 +167,7 @@ export function CupBracket({ bracket, onOpenSummary }) {
   const champion = bracket?.champion;
 
   return (
-    <div className="space-y-4" data-testid="cup-bracket">
+    <div className="space-y-4 min-w-0" data-testid="cup-bracket">
       {champion && (
         <div className="relative overflow-hidden glass rounded-3xl p-5 border border-yellow-500/30" data-testid="cup-champion-banner">
           <div className="absolute -right-8 -top-8 w-32 h-32 bg-yellow-400/20 blur-3xl rounded-full" />
@@ -186,7 +186,7 @@ export function CupBracket({ bracket, onOpenSummary }) {
         </div>
       )}
 
-      <div className="glass rounded-3xl p-3 sm:p-4">
+      <div className="glass rounded-3xl p-3 sm:p-4 min-w-0">
         <div className="flex items-center justify-between mb-2 px-1">
           <span className="text-xs font-bold text-zinc-300 tracking-wide">EŞLEŞME AĞACI</span>
           <span className="text-[10px] text-zinc-500">{current.complete ? "Güncel tur tamamlandı" : "Yana kaydırarak tüm turları görün →"}</span>
@@ -238,6 +238,7 @@ export function CupSummaryModal({ open, onClose }) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="bg-ink-900 border-white/10 text-white max-w-3xl max-h-[90vh] overflow-y-auto thin-scroll p-4" data-testid="cup-summary-modal">
+        <DialogTitle className="sr-only">Turnuva Özeti</DialogTitle>
         <div className="flex items-center justify-end mb-3">
           <button onClick={download} disabled={busy || !data} data-testid="download-cup-summary-btn" className="rounded-full px-5 py-2 bg-neon-green/15 border border-neon-green/40 text-neon-green flex items-center gap-2 disabled:opacity-50">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} PNG İndir
