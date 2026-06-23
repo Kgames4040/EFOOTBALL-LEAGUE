@@ -1,0 +1,1178 @@
+import os
+import uuid
+import random
+import logging
+from pathlib import Path
+from datetime import datetime, timezone
+from typing import List, Optional
+
+from dotenv import load_dotenv
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / ".env")
+
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query
+from starlette.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+from db import db, client
+from auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    get_current_user,
+    require_admin,
+)
+from media import generate_cloudinary_signature, broadcast_push
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="eFootball League Manager")
+api = APIRouter(prefix="/api")
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def new_id():
+    return str(uuid.uuid4())
+
+
+# ----------------------------- Models -----------------------------
+class RegisterReq(BaseModel):
+    username: str
+    password: str
+
+
+class LoginReq(BaseModel):
+    username: str
+    password: str
+
+
+class ManagerInfo(BaseModel):
+    name: str = ""
+    birthdate: str = ""
+    hometown: str = ""
+    nationality: str = ""
+    flag: str = ""
+    photo_url: str = ""
+
+
+class TeamCreateReq(BaseModel):
+    name: str
+    abbreviation: str
+    logo_url: str = ""
+    manager: ManagerInfo = Field(default_factory=ManagerInfo)
+    description: str = ""
+
+
+class Player(BaseModel):
+    id: str = Field(default_factory=new_id)
+    name: str
+    photo_url: str = ""
+    value: float = 0.0
+    slot: str = ""
+    bench: bool = False
+
+
+class SquadReq(BaseModel):
+    formation: str
+    players: List[Player] = []
+
+
+class TeamUpdateReq(BaseModel):
+    name: Optional[str] = None
+    abbreviation: Optional[str] = None
+    logo_url: Optional[str] = None
+    manager: Optional[ManagerInfo] = None
+    description: Optional[str] = None
+    formation: Optional[str] = None
+    players: Optional[List[Player]] = None
+
+
+class TournamentReq(BaseModel):
+    name: str
+    weeks: int = 1
+    cover_url: str = ""
+    mode: str = "league"  # "league" | "cup"
+
+
+class CupResultReq(BaseModel):
+    home_score: int
+    away_score: int
+    pen_winner_team_id: Optional[str] = None
+
+
+class ManualMatch(BaseModel):
+    week: int
+    home_team_id: str
+    away_team_id: str
+    scheduled_time: str = ""
+
+
+class ManualFixtureReq(BaseModel):
+    matches: List[ManualMatch]
+
+
+class FinishReq(BaseModel):
+    home_score: int
+    away_score: int
+
+
+class MatchEditReq(BaseModel):
+    home_score: Optional[int] = None
+    away_score: Optional[int] = None
+    scheduled_time: Optional[str] = None
+    status: Optional[str] = None
+
+
+class LeaderEntry(BaseModel):
+    name: str
+    team: str = ""
+    value: int = 0
+
+
+class LeaderboardReq(BaseModel):
+    scorers: List[LeaderEntry] = []
+    assists: List[LeaderEntry] = []
+
+
+class MagazineReq(BaseModel):
+    title: str
+    body: str = ""
+    image_url: str = ""
+    is_leader_highlight: bool = False
+
+
+class SettingsReq(BaseModel):
+    max_budget: float
+
+
+class AdminUserReq(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+
+class ProfileUpdateReq(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+
+class PushSubReq(BaseModel):
+    endpoint: str
+    keys: dict
+
+
+class PoolPlayerReq(BaseModel):
+    name: str
+    surname: str = ""
+    photo_url: str = ""
+    value: float = 0.0
+    club: str = ""
+    club_logo_url: str = ""
+
+
+# ----------------------------- Auth -----------------------------
+def public_user(u: dict) -> dict:
+    return {"id": u["id"], "username": u["username"], "role": u["role"], "team_id": u.get("team_id")}
+
+
+@api.post("/auth/register")
+async def register(req: RegisterReq):
+    username = req.username.strip()
+    if len(username) < 3:
+        raise HTTPException(400, "Kullanıcı adı en az 3 karakter olmalı")
+    if len(req.password) < 4:
+        raise HTTPException(400, "Şifre en az 4 karakter olmalı")
+    existing = await db.users.find_one({"username_lower": username.lower()})
+    if existing:
+        raise HTTPException(400, "Bu kullanıcı adı zaten alınmış")
+    user = {
+        "id": new_id(),
+        "username": username,
+        "username_lower": username.lower(),
+        "password_hash": hash_password(req.password),
+        "role": "user",
+        "team_id": None,
+        "created_at": now_iso(),
+    }
+    await db.users.insert_one(user)
+    token = create_access_token(user["id"], user["username"], user["role"])
+    return {"token": token, "user": public_user(user)}
+
+
+@api.post("/auth/login")
+async def login(req: LoginReq):
+    user = await db.users.find_one({"username_lower": req.username.strip().lower()})
+    if not user or not verify_password(req.password, user["password_hash"]):
+        raise HTTPException(401, "Kullanıcı adı veya şifre hatalı")
+    token = create_access_token(user["id"], user["username"], user["role"])
+    return {"token": token, "user": public_user(user)}
+
+
+@api.get("/auth/me")
+async def me(user: dict = Depends(get_current_user)):
+    return public_user(user)
+
+
+@api.put("/auth/me")
+async def update_me(req: ProfileUpdateReq, user: dict = Depends(get_current_user)):
+    update = {}
+    if req.username is not None and req.username.strip():
+        uname = req.username.strip()
+        if len(uname) < 3:
+            raise HTTPException(400, "Kullanıcı adı en az 3 karakter olmalı")
+        existing = await db.users.find_one({"username_lower": uname.lower(), "id": {"$ne": user["id"]}})
+        if existing:
+            raise HTTPException(400, "Bu kullanıcı adı zaten alınmış")
+        update["username"] = uname
+        update["username_lower"] = uname.lower()
+    if req.password:
+        if len(req.password) < 4:
+            raise HTTPException(400, "Şifre en az 4 karakter olmalı")
+        update["password_hash"] = hash_password(req.password)
+    if update:
+        await db.users.update_one({"id": user["id"]}, {"$set": update})
+    out = await db.users.find_one({"id": user["id"]})
+    token = create_access_token(out["id"], out["username"], out["role"])
+    return {"user": public_user(out), "token": token}
+
+
+# ----------------------------- Cloudinary -----------------------------
+@api.get("/cloudinary/signature")
+async def cloudinary_signature(user: dict = Depends(get_current_user)):
+    return generate_cloudinary_signature("efootball")
+
+
+# ----------------------------- Settings -----------------------------
+async def get_settings():
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0})
+    if not s:
+        s = {"id": "global", "max_budget": 500.0}
+        await db.settings.insert_one(dict(s))
+    return s
+
+
+@api.get("/settings")
+async def read_settings():
+    return await get_settings()
+
+
+@api.put("/admin/settings")
+async def update_settings(req: SettingsReq, admin: dict = Depends(require_admin)):
+    await db.settings.update_one({"id": "global"}, {"$set": {"max_budget": req.max_budget}}, upsert=True)
+    return await get_settings()
+
+
+# ----------------------------- Teams -----------------------------
+def team_value(team: dict) -> float:
+    return round(sum(float(p.get("value", 0)) for p in team.get("players", [])), 2)
+
+
+async def team_summary(team: dict) -> dict:
+    owner = await db.users.find_one({"id": team["user_id"]}, {"_id": 0, "username": 1})
+    return {
+        "id": team["id"],
+        "name": team["name"],
+        "abbreviation": team["abbreviation"],
+        "logo_url": team.get("logo_url", ""),
+        "manager": team.get("manager", {}),
+        "description": team.get("description", ""),
+        "formation": team.get("formation", "4-3-3"),
+        "value": team_value(team),
+        "player_count": len(team.get("players", [])),
+        "owner": owner["username"] if owner else "",
+    }
+
+
+@api.post("/teams")
+async def create_team(req: TeamCreateReq, user: dict = Depends(get_current_user)):
+    existing = await db.teams.find_one({"user_id": user["id"]})
+    if existing:
+        raise HTTPException(400, "Zaten bir takımınız var")
+    abbr = req.abbreviation.strip().upper()[:3]
+    team = {
+        "id": new_id(),
+        "user_id": user["id"],
+        "name": req.name.strip(),
+        "abbreviation": abbr,
+        "logo_url": req.logo_url,
+        "manager": req.manager.model_dump(),
+        "description": req.description,
+        "formation": "4-3-3",
+        "players": [],
+        "created_at": now_iso(),
+    }
+    await db.teams.insert_one(dict(team))
+    await db.users.update_one({"id": user["id"]}, {"$set": {"team_id": team["id"]}})
+    team.pop("_id", None)
+    return team
+
+
+@api.get("/teams/me")
+async def my_team(user: dict = Depends(get_current_user)):
+    team = await db.teams.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not team:
+        raise HTTPException(404, "Takım bulunamadı")
+    team["value"] = team_value(team)
+    return team
+
+
+@api.put("/teams/me/info")
+async def update_my_team_info(req: TeamUpdateReq, user: dict = Depends(get_current_user)):
+    team = await db.teams.find_one({"user_id": user["id"]})
+    if not team:
+        raise HTTPException(404, "Takım bulunamadı")
+    update = {}
+    if req.name is not None:
+        update["name"] = req.name.strip()
+    if req.abbreviation is not None:
+        update["abbreviation"] = req.abbreviation.strip().upper()[:3]
+    if req.logo_url is not None:
+        update["logo_url"] = req.logo_url
+    if req.manager is not None:
+        update["manager"] = req.manager.model_dump()
+    if req.description is not None:
+        update["description"] = req.description
+    await db.teams.update_one({"id": team["id"]}, {"$set": update})
+    out = await db.teams.find_one({"id": team["id"]}, {"_id": 0})
+    out["value"] = team_value(out)
+    return out
+
+
+@api.put("/teams/me/squad")
+async def save_squad(req: SquadReq, user: dict = Depends(get_current_user)):
+    team = await db.teams.find_one({"user_id": user["id"]})
+    if not team:
+        raise HTTPException(404, "Takım bulunamadı")
+    players = [p.model_dump() for p in req.players]
+    await db.teams.update_one(
+        {"id": team["id"]},
+        {"$set": {"formation": req.formation, "players": players}},
+    )
+    out = await db.teams.find_one({"id": team["id"]}, {"_id": 0})
+    out["value"] = team_value(out)
+    return out
+
+
+@api.get("/teams")
+async def list_teams():
+    teams = await db.teams.find({}, {"_id": 0}).to_list(500)
+    return [await team_summary(t) for t in teams]
+
+
+@api.get("/teams/{team_id}")
+async def get_team(team_id: str):
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(404, "Takım bulunamadı")
+    team["value"] = team_value(team)
+    owner = await db.users.find_one({"id": team["user_id"]}, {"_id": 0, "username": 1})
+    team["owner"] = owner["username"] if owner else ""
+    return team
+
+
+# ----------------------------- Tournament -----------------------------
+async def active_tournament():
+    return await db.tournaments.find_one({"active": True}, {"_id": 0})
+
+
+@api.get("/tournament/active")
+async def read_active_tournament():
+    return await active_tournament()
+
+
+@api.post("/admin/tournament")
+async def start_tournament(req: TournamentReq, admin: dict = Depends(require_admin)):
+    await db.tournaments.update_many({"active": True}, {"$set": {"active": False}})
+    mode = "cup" if req.mode == "cup" else "league"
+    t = {
+        "id": new_id(),
+        "name": req.name.strip(),
+        "weeks": max(1, req.weeks),
+        "cover_url": req.cover_url,
+        "mode": mode,
+        "status": "running",
+        "champion_team_id": None,
+        "active": True,
+        "created_at": now_iso(),
+    }
+    await db.tournaments.insert_one(dict(t))
+    t.pop("_id", None)
+    return t
+
+
+@api.post("/admin/tournament/pause")
+async def pause_tournament(admin: dict = Depends(require_admin)):
+    t = await active_tournament()
+    if not t:
+        raise HTTPException(404, "Aktif turnuva yok")
+    await db.tournaments.update_one({"id": t["id"]}, {"$set": {"status": "paused"}})
+    return {"status": "paused"}
+
+
+@api.post("/admin/tournament/resume")
+async def resume_tournament(admin: dict = Depends(require_admin)):
+    t = await active_tournament()
+    if not t:
+        raise HTTPException(404, "Aktif turnuva yok")
+    await db.tournaments.update_one({"id": t["id"]}, {"$set": {"status": "running"}})
+    return {"status": "running"}
+
+
+@api.delete("/admin/tournament")
+async def delete_tournament(admin: dict = Depends(require_admin)):
+    t = await active_tournament()
+    if not t:
+        raise HTTPException(404, "Aktif turnuva yok")
+    await db.matches.delete_many({"tournament_id": t["id"]})
+    await db.tournaments.delete_one({"id": t["id"]})
+    return {"deleted": True}
+
+
+# ----------------------------- Fixtures / Matches -----------------------------
+def round_robin(team_ids: List[str]):
+    teams = list(team_ids)
+    if len(teams) < 2:
+        return []
+    if len(teams) % 2 == 1:
+        teams.append(None)
+    n = len(teams)
+    rounds = []
+    for r in range(n - 1):
+        pairs = []
+        for i in range(n // 2):
+            home = teams[i]
+            away = teams[n - 1 - i]
+            if home is not None and away is not None:
+                if r % 2 == 1:
+                    home, away = away, home
+                pairs.append((home, away))
+        rounds.append(pairs)
+        teams = [teams[0]] + [teams[-1]] + teams[1:-1]
+    return rounds
+
+
+async def build_match_view(m: dict):
+    home = await db.teams.find_one({"id": m["home_team_id"]}, {"_id": 0, "name": 1, "abbreviation": 1, "logo_url": 1})
+    away = await db.teams.find_one({"id": m["away_team_id"]}, {"_id": 0, "name": 1, "abbreviation": 1, "logo_url": 1})
+    return {
+        "id": m["id"],
+        "week": m["week"],
+        "home_team_id": m["home_team_id"],
+        "away_team_id": m["away_team_id"],
+        "home": home or {"name": "?", "abbreviation": "???", "logo_url": ""},
+        "away": away or {"name": "?", "abbreviation": "???", "logo_url": ""},
+        "home_score": m.get("home_score"),
+        "away_score": m.get("away_score"),
+        "scheduled_time": m.get("scheduled_time", ""),
+        "status": m.get("status", "scheduled"),
+        "finished_at": m.get("finished_at"),
+    }
+
+
+@api.post("/admin/fixture/random")
+async def create_random_fixture(admin: dict = Depends(require_admin)):
+    t = await active_tournament()
+    if not t:
+        raise HTTPException(404, "Önce turnuva başlatın")
+    teams = await db.teams.find({}, {"_id": 0, "id": 1}).to_list(500)
+    ids = [x["id"] for x in teams]
+    if len(ids) < 2:
+        raise HTTPException(400, "Fikstür için en az 2 takım gerekli")
+    await db.matches.delete_many({"tournament_id": t["id"]})
+    rounds = round_robin(ids)
+    # Double round-robin: second leg mirrors venues (home<->away).
+    # This guarantees every team plays every other team twice, and the two
+    # meetings are (len(rounds)) weeks apart so never in consecutive weeks (for >=3 teams).
+    second = [[(away, home) for (home, away) in pairs] for pairs in rounds]
+    rounds = rounds + second
+    docs = []
+    for week_idx, pairs in enumerate(rounds, start=1):
+        for home, away in pairs:
+            docs.append({
+                "id": new_id(),
+                "tournament_id": t["id"],
+                "week": week_idx,
+                "home_team_id": home,
+                "away_team_id": away,
+                "home_score": None,
+                "away_score": None,
+                "scheduled_time": "",
+                "status": "scheduled",
+                "created_at": now_iso(),
+            })
+    if docs:
+        await db.matches.insert_many(docs)
+    await db.tournaments.update_one({"id": t["id"]}, {"$set": {"weeks": len(rounds)}})
+    return {"created": len(docs), "weeks": len(rounds)}
+
+
+@api.post("/admin/fixture/manual")
+async def create_manual_fixture(req: ManualFixtureReq, admin: dict = Depends(require_admin)):
+    t = await active_tournament()
+    if not t:
+        raise HTTPException(404, "Önce turnuva başlatın")
+    await db.matches.delete_many({"tournament_id": t["id"]})
+    docs = []
+    max_week = 1
+    for m in req.matches:
+        max_week = max(max_week, m.week)
+        docs.append({
+            "id": new_id(),
+            "tournament_id": t["id"],
+            "week": m.week,
+            "home_team_id": m.home_team_id,
+            "away_team_id": m.away_team_id,
+            "home_score": None,
+            "away_score": None,
+            "scheduled_time": m.scheduled_time,
+            "status": "scheduled",
+            "created_at": now_iso(),
+        })
+    if docs:
+        await db.matches.insert_many(docs)
+    await db.tournaments.update_one({"id": t["id"]}, {"$set": {"weeks": max_week}})
+    return {"created": len(docs)}
+
+
+@api.get("/matches")
+async def list_matches():
+    t = await active_tournament()
+    if not t:
+        return []
+    matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(2000)
+    matches.sort(key=lambda m: m["week"])
+    return [await build_match_view(m) for m in matches]
+
+
+async def ensure_running():
+    t = await active_tournament()
+    if not t:
+        raise HTTPException(404, "Aktif turnuva yok")
+    if t.get("status") == "paused":
+        raise HTTPException(400, "Turnuva geçici olarak durduruldu")
+    return t
+
+
+@api.post("/admin/matches/{match_id}/start")
+async def start_match(match_id: str, admin: dict = Depends(require_admin)):
+    await ensure_running()
+    m = await db.matches.find_one({"id": match_id})
+    if not m:
+        raise HTTPException(404, "Maç bulunamadı")
+    await db.matches.update_one({"id": match_id}, {"$set": {"status": "live", "started_at": now_iso()}})
+    view = await build_match_view(m)
+    await broadcast_push(
+        "🟢 Maç Başladı!",
+        f"{view['home']['name']} - {view['away']['name']}",
+        "/",
+    )
+    return {"status": "live"}
+
+
+@api.post("/admin/matches/{match_id}/finish")
+async def finish_match(match_id: str, req: FinishReq, admin: dict = Depends(require_admin)):
+    await ensure_running()
+    m = await db.matches.find_one({"id": match_id})
+    if not m:
+        raise HTTPException(404, "Maç bulunamadı")
+    await db.matches.update_one(
+        {"id": match_id},
+        {"$set": {
+            "status": "finished",
+            "home_score": req.home_score,
+            "away_score": req.away_score,
+            "finished_at": now_iso(),
+        }},
+    )
+    view = await build_match_view(m)
+    await broadcast_push(
+        "🏁 Maç Bitti!",
+        f"{view['home']['name']} {req.home_score} - {req.away_score} {view['away']['name']}",
+        "/",
+    )
+    return {"status": "finished"}
+
+
+@api.put("/admin/matches/{match_id}")
+async def edit_match(match_id: str, req: MatchEditReq, admin: dict = Depends(require_admin)):
+    m = await db.matches.find_one({"id": match_id})
+    if not m:
+        raise HTTPException(404, "Maç bulunamadı")
+    update = {}
+    if req.home_score is not None:
+        update["home_score"] = req.home_score
+    if req.away_score is not None:
+        update["away_score"] = req.away_score
+    if req.scheduled_time is not None:
+        update["scheduled_time"] = req.scheduled_time
+    if req.status is not None:
+        update["status"] = req.status
+    if req.home_score is not None and req.away_score is not None and req.status is None:
+        update["status"] = "finished"
+    await db.matches.update_one({"id": match_id}, {"$set": update})
+    out = await db.matches.find_one({"id": match_id})
+    return await build_match_view(out)
+
+
+# ----------------------------- Cup (knockout) -----------------------------
+async def team_lite(team_id):
+    if not team_id:
+        return None
+    t = await db.teams.find_one({"id": team_id}, {"_id": 0, "id": 1, "name": 1, "abbreviation": 1, "logo_url": 1})
+    return t or {"id": team_id, "name": "?", "abbreviation": "???", "logo_url": ""}
+
+
+def cup_round_label(num_teams: int):
+    if num_teams <= 2:
+        return "Final"
+    if num_teams <= 4:
+        return "Yarı Final"
+    if num_teams <= 8:
+        return "Çeyrek Final"
+    if num_teams <= 16:
+        return "Son 16"
+    if num_teams <= 32:
+        return "Son 32"
+    return None
+
+
+def cup_match_doc(tid, round_no, slot, home, away):
+    return {
+        "id": new_id(),
+        "tournament_id": tid,
+        "mode": "cup",
+        "round": round_no,
+        "week": round_no,
+        "slot_index": slot,
+        "home_team_id": home,
+        "away_team_id": away,
+        "home_score": None,
+        "away_score": None,
+        "pen_winner_team_id": None,
+        "winner_team_id": None,
+        "bye": False,
+        "status": "scheduled",
+        "created_at": now_iso(),
+    }
+
+
+async def create_cup_round(tid, round_no, team_ids):
+    teams = list(team_ids)
+    bye_team = None
+    if len(teams) % 2 == 1:
+        bye_team = teams.pop()  # leftover team advances automatically
+    docs = []
+    slot = 0
+    for i in range(0, len(teams), 2):
+        docs.append(cup_match_doc(tid, round_no, slot, teams[i], teams[i + 1]))
+        slot += 1
+    if bye_team is not None:
+        d = cup_match_doc(tid, round_no, slot, bye_team, None)
+        d.update({"status": "finished", "winner_team_id": bye_team, "bye": True, "finished_at": now_iso()})
+        docs.append(d)
+    if docs:
+        await db.matches.insert_many(docs)
+    await maybe_advance_round(tid, round_no)
+
+
+async def maybe_advance_round(tid, round_no):
+    matches = await db.matches.find({"tournament_id": tid, "round": round_no, "mode": "cup"}).to_list(500)
+    if not matches:
+        return
+    if any(m.get("winner_team_id") is None for m in matches):
+        return  # round not complete yet
+    nxt = await db.matches.find_one({"tournament_id": tid, "round": round_no + 1, "mode": "cup"})
+    if nxt:
+        return  # already advanced
+    matches.sort(key=lambda x: x["slot_index"])
+    winners = [m["winner_team_id"] for m in matches]
+    name_map = {tm["id"]: tm["name"] for tm in await db.teams.find({"id": {"$in": winners}}, {"_id": 0, "id": 1, "name": 1}).to_list(500)}
+    names = [name_map.get(w, "?") for w in winners]
+    if len(winners) == 1:
+        champ = winners[0]
+        await db.tournaments.update_one({"id": tid}, {"$set": {"champion_team_id": champ, "status": "finished"}})
+        await publish_magazine(tid, "🏆 Şampiyon", f"{names[0]} kupanın sahibi oldu! Tebrikler.")
+    else:
+        await publish_magazine(tid, f"{round_no}. Tur Atlayanları", "Tur atlayan takımlar: " + ", ".join(names))
+        await create_cup_round(tid, round_no + 1, winners)
+
+
+async def build_cup_match_view(m):
+    return {
+        "id": m["id"],
+        "round": m["round"],
+        "slot_index": m["slot_index"],
+        "home": await team_lite(m["home_team_id"]),
+        "away": await team_lite(m.get("away_team_id")),
+        "home_score": m.get("home_score"),
+        "away_score": m.get("away_score"),
+        "winner_team_id": m.get("winner_team_id"),
+        "pen_winner_team_id": m.get("pen_winner_team_id"),
+        "bye": m.get("bye", False),
+        "status": m.get("status", "scheduled"),
+    }
+
+
+async def build_cup_bracket(t):
+    matches = await db.matches.find({"tournament_id": t["id"], "mode": "cup"}, {"_id": 0}).to_list(2000)
+    rounds_map = {}
+    for m in matches:
+        rounds_map.setdefault(m["round"], []).append(m)
+    rounds = []
+    for rnd in sorted(rounds_map):
+        ms = sorted(rounds_map[rnd], key=lambda x: x["slot_index"])
+        num_teams = sum(1 if mm.get("bye") else 2 for mm in ms)
+        rounds.append({
+            "round": rnd,
+            "label": cup_round_label(num_teams) or f"{rnd}. Tur",
+            "matches": [await build_cup_match_view(mm) for mm in ms],
+            "complete": all(mm.get("winner_team_id") for mm in ms),
+        })
+    champ = None
+    if t.get("champion_team_id"):
+        champ = await team_lite(t["champion_team_id"])
+    return {
+        "rounds": rounds,
+        "champion": champ,
+        "status": t.get("status"),
+        "tournament": {"name": t["name"], "cover_url": t.get("cover_url", "")},
+    }
+
+
+@api.get("/cup/bracket")
+async def cup_bracket():
+    t = await active_tournament()
+    if not t or t.get("mode") != "cup":
+        return {"rounds": [], "champion": None, "status": None, "tournament": None}
+    return await build_cup_bracket(t)
+
+
+@api.get("/cup/summary")
+async def cup_summary():
+    t = await active_tournament()
+    if not t or t.get("mode") != "cup":
+        raise HTTPException(404, "Aktif kupa yok")
+    data = await build_cup_bracket(t)
+    matches = await db.matches.find(
+        {"tournament_id": t["id"], "mode": "cup", "status": "finished"}, {"_id": 0}
+    ).to_list(2000)
+    goals = {}
+    for m in matches:
+        if m.get("bye") or m.get("home_score") is None:
+            continue
+        goals[m["home_team_id"]] = goals.get(m["home_team_id"], 0) + (m.get("home_score") or 0)
+        goals[m["away_team_id"]] = goals.get(m["away_team_id"], 0) + (m.get("away_score") or 0)
+    top = None
+    if goals:
+        top_id = max(goals, key=lambda k: goals[k])
+        tl = await team_lite(top_id)
+        top = {**tl, "goals": goals[top_id]}
+    data["top_scorer_team"] = top
+    return data
+
+
+@api.post("/admin/cup/draw")
+async def cup_draw(admin: dict = Depends(require_admin)):
+    t = await active_tournament()
+    if not t or t.get("mode") != "cup":
+        raise HTTPException(400, "Aktif bir kupa yok")
+    teams = await db.teams.find({}, {"_id": 0, "id": 1}).to_list(500)
+    ids = [x["id"] for x in teams]
+    if len(ids) < 2:
+        raise HTTPException(400, "Kupa için en az 2 takım gerekli")
+    await db.matches.delete_many({"tournament_id": t["id"]})
+    await db.tournaments.update_one({"id": t["id"]}, {"$set": {"champion_team_id": None, "status": "running"}})
+    random.shuffle(ids)
+    await create_cup_round(t["id"], 1, ids)
+    return {"ok": True, "teams": len(ids)}
+
+
+@api.post("/admin/cup/reset")
+async def cup_reset(admin: dict = Depends(require_admin)):
+    t = await active_tournament()
+    if not t or t.get("mode") != "cup":
+        raise HTTPException(400, "Aktif bir kupa yok")
+    await db.matches.delete_many({"tournament_id": t["id"]})
+    await db.tournaments.update_one({"id": t["id"]}, {"$set": {"champion_team_id": None, "status": "running"}})
+    return {"ok": True}
+
+
+@api.post("/admin/cup/match/{match_id}/start")
+async def cup_start_match(match_id: str, admin: dict = Depends(require_admin)):
+    await ensure_running()
+    m = await db.matches.find_one({"id": match_id})
+    if not m or m.get("mode") != "cup":
+        raise HTTPException(404, "Kupa maçı bulunamadı")
+    if m.get("bye"):
+        raise HTTPException(400, "Bay (otomatik tur atlayan) maçı başlatılamaz")
+    if m.get("status") == "finished":
+        raise HTTPException(400, "Maç zaten bitti")
+    nxt = await db.matches.find_one({"tournament_id": m["tournament_id"], "round": m["round"] + 1, "mode": "cup"})
+    if nxt:
+        raise HTTPException(400, "Sonraki tur oluşturuldu. Bu turu düzenlemek için kupayı sıfırlayın.")
+    await db.matches.update_one({"id": match_id}, {"$set": {"status": "live", "started_at": now_iso()}})
+    home = await team_lite(m["home_team_id"])
+    away = await team_lite(m.get("away_team_id"))
+    await broadcast_push("🟢 Maç Başladı!", f"{home['name']} - {away['name'] if away else '?'}", "/")
+    return {"status": "live"}
+
+
+@api.post("/admin/cup/match/{match_id}/result")
+async def cup_set_result(match_id: str, req: CupResultReq, admin: dict = Depends(require_admin)):
+    await ensure_running()
+    m = await db.matches.find_one({"id": match_id})
+    if not m or m.get("mode") != "cup":
+        raise HTTPException(404, "Kupa maçı bulunamadı")
+    if m.get("bye"):
+        raise HTTPException(400, "Bay (otomatik tur atlayan) maçı düzenlenemez")
+    if m.get("status") not in ("live", "finished"):
+        raise HTTPException(400, "Önce maçı başlatın")
+    nxt = await db.matches.find_one({"tournament_id": m["tournament_id"], "round": m["round"] + 1, "mode": "cup"})
+    if nxt:
+        raise HTTPException(400, "Sonraki tur oluşturuldu. Bu turu düzenlemek için kupayı sıfırlayın.")
+    hs, as_ = req.home_score, req.away_score
+    if hs < 0 or as_ < 0:
+        raise HTTPException(400, "Skor negatif olamaz")
+    if hs == as_:
+        pw = req.pen_winner_team_id
+        if pw not in (m["home_team_id"], m["away_team_id"]):
+            raise HTTPException(400, "Berabere maçta penaltı galibini seçmelisiniz")
+        winner = pw
+    else:
+        winner = m["home_team_id"] if hs > as_ else m["away_team_id"]
+    was_finished = m.get("status") == "finished"
+    await db.matches.update_one(
+        {"id": match_id},
+        {"$set": {
+            "home_score": hs,
+            "away_score": as_,
+            "pen_winner_team_id": (req.pen_winner_team_id if hs == as_ else None),
+            "winner_team_id": winner,
+            "status": "finished",
+            "finished_at": now_iso(),
+        }},
+    )
+    if not was_finished:
+        home = await team_lite(m["home_team_id"])
+        away = await team_lite(m.get("away_team_id"))
+        pen = " (P)" if hs == as_ else ""
+        await broadcast_push("🏁 Maç Bitti!", f"{home['name']} {hs} - {as_} {away['name'] if away else '?'}{pen}", "/")
+    await maybe_advance_round(m["tournament_id"], m["round"])
+    return {"ok": True, "winner_team_id": winner}
+
+
+# ----------------------------- Standings -----------------------------
+@api.get("/standings")
+async def standings():
+    t = await active_tournament()
+    if not t:
+        return []
+    matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(2000)
+    team_ids = set()
+    for m in matches:
+        team_ids.add(m["home_team_id"])
+        team_ids.add(m["away_team_id"])
+    teams = await db.teams.find({"id": {"$in": list(team_ids)}}, {"_id": 0}).to_list(500)
+    table = {}
+    for tm in teams:
+        table[tm["id"]] = {
+            "team_id": tm["id"],
+            "name": tm["name"],
+            "abbreviation": tm["abbreviation"],
+            "logo_url": tm.get("logo_url", ""),
+            "OM": 0, "G": 0, "B": 0, "M": 0, "AG": 0, "YG": 0, "A": 0, "P": 0,
+            "last5": [],
+            "_seq": [],
+        }
+    finished = [m for m in matches if m.get("status") == "finished" and m.get("home_score") is not None]
+    finished.sort(key=lambda m: (m["week"], m.get("finished_at") or ""))
+    for m in finished:
+        h, a = m["home_team_id"], m["away_team_id"]
+        hs, as_ = m["home_score"], m["away_score"]
+        if h not in table or a not in table:
+            continue
+        for tid, gf, ga in ((h, hs, as_), (a, as_, hs)):
+            row = table[tid]
+            row["OM"] += 1
+            row["AG"] += gf
+            row["YG"] += ga
+            if gf > ga:
+                row["G"] += 1
+                row["P"] += 3
+                row["_seq"].append("W")
+            elif gf == ga:
+                row["B"] += 1
+                row["P"] += 1
+                row["_seq"].append("D")
+            else:
+                row["M"] += 1
+                row["_seq"].append("L")
+    rows = []
+    for row in table.values():
+        row["A"] = row["AG"] - row["YG"]
+        row["last5"] = row["_seq"][-5:]
+        del row["_seq"]
+        rows.append(row)
+    rows.sort(key=lambda r: (-r["P"], -r["A"], -r["AG"], r["name"]))
+    for i, r in enumerate(rows, start=1):
+        r["rank"] = i
+    return rows
+
+
+# ----------------------------- Leaderboard / Stats -----------------------------
+@api.get("/leaderboard")
+async def get_leaderboard():
+    t = await active_tournament()
+    tid = t["id"] if t else None
+    scorers = await db.leaderboard.find({"tournament_id": tid, "kind": "scorer"}, {"_id": 0}).to_list(100)
+    assists = await db.leaderboard.find({"tournament_id": tid, "kind": "assist"}, {"_id": 0}).to_list(100)
+    scorers.sort(key=lambda x: -x["value"])
+    assists.sort(key=lambda x: -x["value"])
+    return {"scorers": scorers, "assists": assists}
+
+
+@api.put("/admin/leaderboard")
+async def set_leaderboard(req: LeaderboardReq, admin: dict = Depends(require_admin)):
+    t = await active_tournament()
+    tid = t["id"] if t else None
+    await db.leaderboard.delete_many({"tournament_id": tid})
+    docs = []
+    for e in req.scorers:
+        docs.append({"id": new_id(), "tournament_id": tid, "kind": "scorer", **e.model_dump()})
+    for e in req.assists:
+        docs.append({"id": new_id(), "tournament_id": tid, "kind": "assist", **e.model_dump()})
+    if docs:
+        await db.leaderboard.insert_many(docs)
+    return {"ok": True}
+
+
+# ----------------------------- Magazine -----------------------------
+@api.get("/magazine")
+async def get_magazine():
+    items = await db.magazine.find({}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    return items
+
+
+async def publish_magazine(tournament_id, title, body="", image_url="", is_leader_highlight=False, push=True):
+    doc = {
+        "id": new_id(),
+        "tournament_id": tournament_id,
+        "title": title,
+        "body": body,
+        "image_url": image_url,
+        "is_leader_highlight": is_leader_highlight,
+        "created_at": now_iso(),
+    }
+    await db.magazine.insert_one(dict(doc))
+    doc.pop("_id", None)
+    if push:
+        await broadcast_push(f"📰 {title}", (body or "")[:140] or "Yeni haber yayınlandı", "/")
+    return doc
+
+
+@api.post("/admin/magazine")
+async def add_magazine(req: MagazineReq, admin: dict = Depends(require_admin)):
+    t = await active_tournament()
+    return await publish_magazine(
+        t["id"] if t else None, req.title, req.body, req.image_url, req.is_leader_highlight
+    )
+
+
+@api.delete("/admin/magazine/{item_id}")
+async def delete_magazine(item_id: str, admin: dict = Depends(require_admin)):
+    await db.magazine.delete_one({"id": item_id})
+    return {"deleted": True}
+
+
+# ----------------------------- Player Pool (admin-managed) -----------------------------
+@api.post("/admin/players")
+async def add_pool_player(req: PoolPlayerReq, admin: dict = Depends(require_admin)):
+    doc = {"id": new_id(), **req.model_dump(), "created_at": now_iso()}
+    await db.player_pool.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@api.put("/admin/players/{player_id}")
+async def update_pool_player(player_id: str, req: PoolPlayerReq, admin: dict = Depends(require_admin)):
+    res = await db.player_pool.update_one({"id": player_id}, {"$set": req.model_dump()})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Oyuncu bulunamadı")
+    return {"ok": True}
+
+
+@api.delete("/admin/players/{player_id}")
+async def delete_pool_player(player_id: str, admin: dict = Depends(require_admin)):
+    await db.player_pool.delete_one({"id": player_id})
+    return {"deleted": True}
+
+
+@api.get("/players")
+async def search_pool_players(q: str = Query("", description="arama")):
+    query = {}
+    if q.strip():
+        query = {"$or": [
+            {"name": {"$regex": q.strip(), "$options": "i"}},
+            {"surname": {"$regex": q.strip(), "$options": "i"}},
+            {"club": {"$regex": q.strip(), "$options": "i"}},
+        ]}
+    players = await db.player_pool.find(query, {"_id": 0}).sort("value", -1).to_list(300)
+    return players
+
+
+# ----------------------------- Admin user / team management -----------------------------
+@api.get("/admin/users")
+async def admin_list_users(admin: dict = Depends(require_admin)):
+    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(500)
+    for u in users:
+        team = await db.teams.find_one({"user_id": u["id"]}, {"_id": 0, "name": 1, "id": 1})
+        u["team_name"] = team["name"] if team else None
+        u["team_id"] = team["id"] if team else None
+    return users
+
+
+@api.put("/admin/users/{user_id}")
+async def admin_update_user(user_id: str, req: AdminUserReq, admin: dict = Depends(require_admin)):
+    u = await db.users.find_one({"id": user_id})
+    if not u:
+        raise HTTPException(404, "Kullanıcı bulunamadı")
+    update = {}
+    if req.username:
+        update["username"] = req.username.strip()
+        update["username_lower"] = req.username.strip().lower()
+    if req.password:
+        update["password_hash"] = hash_password(req.password)
+    if update:
+        await db.users.update_one({"id": user_id}, {"$set": update})
+    return {"ok": True}
+
+
+@api.delete("/admin/users/{user_id}")
+async def admin_delete_user(user_id: str, admin: dict = Depends(require_admin)):
+    if user_id == admin["id"]:
+        raise HTTPException(400, "Kendinizi silemezsiniz")
+    await db.teams.delete_many({"user_id": user_id})
+    await db.users.delete_one({"id": user_id})
+    return {"deleted": True}
+
+
+@api.put("/admin/teams/{team_id}")
+async def admin_update_team(team_id: str, req: TeamUpdateReq, admin: dict = Depends(require_admin)):
+    team = await db.teams.find_one({"id": team_id})
+    if not team:
+        raise HTTPException(404, "Takım bulunamadı")
+    update = {}
+    for field in ["name", "abbreviation", "logo_url", "description", "formation"]:
+        val = getattr(req, field)
+        if val is not None:
+            update[field] = val
+    if req.manager is not None:
+        update["manager"] = req.manager.model_dump()
+    if req.players is not None:
+        update["players"] = [p.model_dump() for p in req.players]
+    await db.teams.update_one({"id": team_id}, {"$set": update})
+    out = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    out["value"] = team_value(out)
+    return out
+
+
+@api.delete("/admin/teams/{team_id}")
+async def admin_delete_team(team_id: str, admin: dict = Depends(require_admin)):
+    team = await db.teams.find_one({"id": team_id})
+    if not team:
+        raise HTTPException(404, "Takım bulunamadı")
+    await db.users.update_one({"id": team["user_id"]}, {"$set": {"team_id": None}})
+    await db.teams.delete_one({"id": team_id})
+    await db.matches.delete_many({"$or": [{"home_team_id": team_id}, {"away_team_id": team_id}]})
+    return {"deleted": True}
+
+
+# ----------------------------- Day summary -----------------------------
+@api.get("/day-summary")
+async def day_summary(date: str = Query(...)):
+    t = await active_tournament()
+    if not t:
+        return {"date": date, "matches": [], "standings": []}
+    matches = await db.matches.find(
+        {"tournament_id": t["id"], "status": "finished"}, {"_id": 0}
+    ).to_list(2000)
+    day_matches = [m for m in matches if (m.get("finished_at") or "").startswith(date)]
+    day_matches.sort(key=lambda m: m.get("finished_at") or "")
+    views = [await build_match_view(m) for m in day_matches]
+    table = await standings()
+    return {"date": date, "tournament": t["name"], "matches": views, "standings": table}
+
+
+# ----------------------------- Push -----------------------------
+@api.get("/push/public-key")
+async def push_public_key():
+    return {"publicKey": os.getenv("VAPID_PUBLIC_KEY")}
+
+
+@api.post("/push/subscribe")
+async def push_subscribe(req: PushSubReq, user: dict = Depends(get_current_user)):
+    await db.push_subscriptions.update_one(
+        {"endpoint": req.endpoint},
+        {"$set": {"endpoint": req.endpoint, "keys": req.keys, "user_id": user["id"], "updated_at": now_iso()}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+@api.post("/push/unsubscribe")
+async def push_unsubscribe(req: PushSubReq, user: dict = Depends(get_current_user)):
+    await db.push_subscriptions.delete_one({"endpoint": req.endpoint})
+    return {"ok": True}
+
+
+@api.get("/")
+async def root():
+    return {"message": "eFootball League Manager API"}
+
+
+app.include_router(api)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.on_event("startup")
+async def startup():
+    await db.users.create_index("username_lower", unique=True)
+    await db.teams.create_index("user_id")
+    await db.matches.create_index("tournament_id")
+    admin_username = os.environ.get("ADMIN_USERNAME", "neco")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "neco404")
+    existing = await db.users.find_one({"username_lower": admin_username.lower()})
+    if not existing:
+        await db.users.insert_one({
+            "id": new_id(),
+            "username": admin_username,
+            "username_lower": admin_username.lower(),
+            "password_hash": hash_password(admin_password),
+            "role": "admin",
+            "team_id": None,
+            "created_at": now_iso(),
+        })
+        logger.info("Admin oluşturuldu: %s", admin_username)
+    elif not verify_password(admin_password, existing["password_hash"]):
+        await db.users.update_one(
+            {"id": existing["id"]},
+            {"$set": {"password_hash": hash_password(admin_password), "role": "admin"}},
+        )
+    elif existing.get("role") != "admin":
+        await db.users.update_one({"id": existing["id"]}, {"$set": {"role": "admin"}})
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    client.close()
