@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { ImageUpload } from "./ImageUpload";
@@ -86,6 +86,7 @@ export function ProfileDialog({ open, onClose }) {
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="glass-strong border-white/10 text-white sm:max-w-lg max-h-[88vh] overflow-y-auto thin-scroll" data-testid="profile-dialog">
         <DialogHeader><DialogTitle className="font-heading flex items-center gap-2"><User className="w-5 h-5 text-neon-blue" /> Profilim</DialogTitle></DialogHeader>
+        <DialogDescription className="sr-only">Hesap ve takım bilgilerinizi güncelleyin.</DialogDescription>
 
         {hasTeam && (
           <div className="flex gap-2 p-1 glass rounded-full mb-1">
