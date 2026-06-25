@@ -43,6 +43,12 @@ Türkçe eFootball lig/kupa yönetim uygulaması. Final sürüm öncesi düzeltm
 - GET /api/health eklendi (Render keep-alive ping için).
 
 ## Kalan Fazlar (sıradaki)
-- FAZ 3 (sıradaki): Canlı maç takip ekranı + gol bildirim butonu (popup, takım seç, +1 canlı, GOOOOL push), gol düzeltme, 1./2. yarı başlat-bitir, 10dk→90dk saat simülasyonu + uzatma + 1.5dk mola, İLK YARI/MAÇ BİTTİ bildirimleri, bildirimlerin ilgili maça deep-link'i. Admin sadece atanan maçta bu kontrolleri yapar.
-- FAZ 4: Tek-sayı tur ilerlemesinde mini lig (round-robin) eşleştirme; maç iptali (X + sebep + magazin + ligde 0 puan / kupada kurucu kararı); magazin video (Cloudinary upload + YouTube link); oyuncu havuzu takım list box + takım ekle + kilitli oyuncu değeri.
-- FAZ 1 (kalan): Bracket & fikstür & puan durumu "tam ekran için tıkla" modalları (dikey kaydırma yerine sığdır); Cloudflare 5xx dayanıklılığı.
+## Faz 3 — Canlı Maç Sistemi (2026-06) ✅ test edildi (iteration_6: backend 7/7 + frontend 6/6)
+- Maç takip ekranı /match/:id: maç öncesi (logolar, isimler, TD, son-5 form), canlı (CANLI rozeti, dakika saati, canlı skor), bitmiş görünüm.
+- Canlı kontroller (kurucu VEYA atanan admin): start/end-first-half (İLK YARI push), start-second-half, end-match (MAÇ BİTTİ push + sonuç işleme), goal (popup → +1 → GOOOOL push), correct-goal (gerçek golcüyü seç → gol taşınır).
+- Saat: HALF_REAL_SEC=300 (45dk≈5 gerçek dk), uzatma random 1-5dk, mola 90sn. Dakika client-side hesaplanır.
+- Yetki: check_match_access (founder=her maç, admin=assigned_match_id), 403 korumalı. Deep-link: bildirimler /match/:id (sw.js client.navigate). Fikstür+kupa kartları tıklanır, dashboard canlı skor gösterir.
+
+## Kalan Fazlar
+- FAZ 4: Tek-sayı turda mini lig eşleştirme; maç iptali (X+sebep+magazin+puan/kupa kararı); magazin video (upload+YouTube); oyuncu havuzu takım list box + kilitli oyuncu değeri.
+- FAZ 1 (kalan): Bracket & fikstür & puan durumu "tam ekran için tıkla" modalları.
