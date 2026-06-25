@@ -34,7 +34,15 @@ Türkçe eFootball lig/kupa yönetim uygulaması. Final sürüm öncesi düzeltm
 - Backend pytest (yeni): 7/7 geçti (auth/me, kupa silme, tam kupa akışı). Eski bayat test dosyası silindi.
 - Frontend (testing agent): iteration_1 (kupa silme + admin profil) ve iteration_2 (normal kullanıcı 2 sekmeli profil, mobil taşma yok, masaüstü grid, kadro toast) — hepsi geçti.
 
-## Backlog / Sonraki Adımlar
-- ✅ (2026-06) Bracket ağaç görünümü: turlar sütun olarak + aralarında bağlantı çizgileri (Connector/BracketTree). İç kısım yatay kaydırmalı, sayfa taşmıyor (min-w-0 ile grid taşması giderildi).
-- ✅ (2026-06) Kupa özeti PNG export: takım kısaltmaları dikey kırpılması düzeltildi (truncate kaldırıldı, line-height + html2canvas onclone). Özette de bağlantı çizgili ağaç.
-- P2: Bracket'te ileride animasyonlu kazanan vurgusu / tema seçenekleri (opsiyonel).
+## Faz 2 — Kurucu/Admin Rol Sistemi (2026-06) ✅ test edildi (iteration_5, 7/7)
+- `neco` artık KURUCU (founder). Backend: require_founder ile tüm yönetim endpoint'leri kurucuya kısıtlandı; require_staff eklendi (Faz 3 canlı maç için).
+- Rol atama: POST /founder/users/{id}/grant-admin {match_id}, /revoke-admin, GET /founder/staff. Admin bir maça atanır; sadece atanan maç panelini görür (canlı kontroller Faz 3).
+- Branding: GET /branding (public) + PUT /founder/branding. Uygulama adı, logo, favicon kurucu panelinden değişir; header anında güncellenir.
+- Kurucu paneli: yeni "Roller" + "Marka" sekmeleri; Kullanıcılar sekmesinde "Takımı Düzenle" (her kullanıcının takım/TD/logo/ülke/açıklama bilgisi düzenlenir).
+- Faz 1'den foldlananlar: profil menüsüne Çıkış Yap; yenile butonu artık mevcut ekranda kalır (MobileReloadRedirect kaldırıldı); oturum kalıcılığı (backend cold-start'ta cached_user ile logout yapmaz, sadece 401/403'te çıkış).
+- GET /api/health eklendi (Render keep-alive ping için).
+
+## Kalan Fazlar (sıradaki)
+- FAZ 3 (sıradaki): Canlı maç takip ekranı + gol bildirim butonu (popup, takım seç, +1 canlı, GOOOOL push), gol düzeltme, 1./2. yarı başlat-bitir, 10dk→90dk saat simülasyonu + uzatma + 1.5dk mola, İLK YARI/MAÇ BİTTİ bildirimleri, bildirimlerin ilgili maça deep-link'i. Admin sadece atanan maçta bu kontrolleri yapar.
+- FAZ 4: Tek-sayı tur ilerlemesinde mini lig (round-robin) eşleştirme; maç iptali (X + sebep + magazin + ligde 0 puan / kupada kurucu kararı); magazin video (Cloudinary upload + YouTube link); oyuncu havuzu takım list box + takım ekle + kilitli oyuncu değeri.
+- FAZ 1 (kalan): Bracket & fikstür & puan durumu "tam ekran için tıkla" modalları (dikey kaydırma yerine sığdır); Cloudflare 5xx dayanıklılığı.
