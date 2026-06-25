@@ -491,6 +491,7 @@ async def build_match_view(m: dict):
         "live_home": m.get("live_home", 0),
         "live_away": m.get("live_away", 0),
         "finished_at": m.get("finished_at"),
+        "cancel_reason": m.get("cancel_reason", ""),
     }
 
 
@@ -637,6 +638,35 @@ async def edit_match(match_id: str, req: MatchEditReq, admin: dict = Depends(req
     await db.matches.update_one({"id": match_id}, {"$set": update})
     out = await db.matches.find_one({"id": match_id})
     return await build_match_view(out)
+
+
+@api.post("/admin/matches/{match_id}/cancel")
+async def cancel_match(match_id: str, req: CancelMatchReq, admin: dict = Depends(require_founder)):
+    m = await db.matches.find_one({"id": match_id})
+    if not m:
+        raise HTTPException(404, "Maç bulunamadı")
+    if m.get("status") == "canceled":
+        raise HTTPException(400, "Maç zaten iptal edilmiş")
+    await db.matches.update_one(
+        {"id": match_id},
+        {"$set": {
+            "status": "canceled",
+            "cancel_reason": req.reason or "",
+            "home_score": None,
+            "away_score": None,
+            "live_state": "scheduled",
+            "canceled_at": now_iso(),
+        }},
+    )
+    view = await build_match_view(m)
+    t = await active_tournament()
+    await publish_magazine(
+        t["id"] if t else None,
+        f"⛔ MAÇ İPTALİ {view['home']['name']} - {view['away']['name']}",
+        req.reason or "Maç iptal edildi.",
+        url="/",
+    )
+    return {"status": "canceled"}
 
 
 # ----------------------------- Cup (knockout) -----------------------------
@@ -793,6 +823,7 @@ async def build_cup_match_view(m):
         "live_state": m.get("live_state", "scheduled"),
         "live_home": m.get("live_home", 0),
         "live_away": m.get("live_away", 0),
+        "cancel_reason": m.get("cancel_reason", ""),
     }
 
 
@@ -942,6 +973,45 @@ async def cup_set_result(match_id: str, req: CupResultReq, admin: dict = Depends
         await broadcast_push("🏁 Maç Bitti!", f"{home['name']} {hs} - {as_} {away['name'] if away else '?'}{pen}", "/")
     await maybe_advance_round(m["tournament_id"], m["round"])
     return {"ok": True, "winner_team_id": winner}
+
+
+@api.post("/admin/cup/match/{match_id}/cancel")
+async def cup_cancel_match(match_id: str, req: CupCancelReq, admin: dict = Depends(require_founder)):
+    m = await db.matches.find_one({"id": match_id})
+    if not m or m.get("mode") != "cup":
+        raise HTTPException(404, "Kupa maçı bulunamadı")
+    if m.get("bye"):
+        raise HTTPException(400, "Bay (otomatik tur atlayan) maçı iptal edilemez")
+    nxt = await db.matches.find_one({"tournament_id": m["tournament_id"], "round": m["round"] + 1, "mode": "cup"})
+    if nxt:
+        raise HTTPException(400, "Sonraki tur oluşturuldu. Bu turu düzenlemek için kupayı sıfırlayın.")
+    winner = None
+    if req.cup_action == "advance":
+        if req.advance_team_id not in (m["home_team_id"], m.get("away_team_id")):
+            raise HTTPException(400, "Üst tura çıkacak takımı seçin")
+        winner = req.advance_team_id
+    await db.matches.update_one(
+        {"id": match_id},
+        {"$set": {
+            "status": "canceled",
+            "cancel_reason": req.reason or "",
+            "winner_team_id": winner,
+            "home_score": None,
+            "away_score": None,
+            "live_state": "scheduled",
+            "canceled_at": now_iso(),
+        }},
+    )
+    home = await team_lite(m["home_team_id"])
+    away = await team_lite(m.get("away_team_id"))
+    await publish_magazine(
+        m["tournament_id"],
+        f"⛔ MAÇ İPTALİ {home['name']} - {away['name'] if away else '?'}",
+        req.reason or "Maç iptal edildi.",
+        url="/",
+    )
+    await maybe_advance_round(m["tournament_id"], m["round"])
+    return {"status": "canceled", "winner_team_id": winner}
 
 
 # ----------------------------- Live match system -----------------------------
@@ -1202,6 +1272,17 @@ async def standings():
                 row["P"] += 1
                 row["_seq"].append("D")
             else:
+                row["M"] += 1
+                row["_seq"].append("L")
+    # Canceled matches count as played (0 points for both sides)
+    canceled = [m for m in matches if m.get("status") == "canceled"]
+    canceled.sort(key=lambda m: (m["week"], m.get("canceled_at") or ""))
+    for m in canceled:
+        h, a = m["home_team_id"], m["away_team_id"]
+        for tid in (h, a):
+            if tid in table:
+                row = table[tid]
+                row["OM"] += 1
                 row["M"] += 1
                 row["_seq"].append("L")
     rows = []

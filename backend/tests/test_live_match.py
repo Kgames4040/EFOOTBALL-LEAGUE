@@ -4,7 +4,7 @@ import time
 import pytest
 import requests
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://delivery-ready-v1.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://admin-control-hub-126.preview.emergentagent.com').rstrip('/')
 API = f"{BASE_URL}/api"
 
 FOUNDER = ("neco", "neco404")

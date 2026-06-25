@@ -5,6 +5,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs"
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { ImageUpload } from "../components/ImageUpload";
+import { VideoUpload } from "../components/VideoUpload";
+import { CancelMatchDialog } from "../components/CancelMatchDialog";
 import { CountrySelect } from "../components/CountrySelect";
 import { flagEmoji } from "../lib/countries";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
@@ -15,7 +17,7 @@ import api, { formatError } from "../lib/api";
 import html2canvas from "html2canvas";
 import {
   Trophy, PlayCircle, PauseCircle, Trash2, Shuffle, Plus, Save, Download,
-  Flag, FlagOff, Pencil, X, Loader2, ShieldHalf, UserCog, Palette, Shield, Crown,
+  Flag, FlagOff, Pencil, X, Loader2, ShieldHalf, UserCog, Palette, Shield, Crown, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -184,6 +186,7 @@ function CupTab({ tournament, onChange }) {
   const [bracket, setBracket] = useState(null);
   const [inputs, setInputs] = useState({}); // { matchId: {home, away, pen} }
   const [busy, setBusy] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState(null);
 
   const load = () => api.get("/cup/bracket").then((r) => setBracket(r.data));
   useEffect(() => { load(); }, []);
@@ -282,9 +285,13 @@ function CupTab({ tournament, onChange }) {
                         {m.bye && <span className="text-[10px] neon-text-green ml-1">BAY · Tur Atladı</span>}
                         {!m.bye && m.status === "live" && <span className="text-[10px] neon-text-green animate-pulse-glow ml-1">CANLI</span>}
                         {!m.bye && m.status === "finished" && <span className="text-sm ml-1 text-zinc-300">{m.home_score}-{m.away_score}{m.pen_winner_team_id ? " (P)" : ""}</span>}
+                        {!m.bye && m.status === "canceled" && <span className="text-[10px] text-red-400 ml-1">İPTAL{m.cancel_reason ? ` · ${m.cancel_reason}` : ""}</span>}
                       </div>
                       {!m.bye && editable && m.status === "scheduled" && (
                         <button onClick={() => start(m)} data-testid={`cup-start-${m.id}`} className="btn-primary rounded-full px-4 py-1.5 text-sm flex items-center gap-1"><Flag className="w-3.5 h-3.5" /> Başlat</button>
+                      )}
+                      {!m.bye && editable && m.status !== "finished" && m.status !== "canceled" && (
+                        <button onClick={() => setCancelTarget(m)} data-testid={`cup-cancel-${m.id}`} title="Maçı iptal et" className="rounded-full p-1.5 bg-red-500/15 border border-red-500/40 text-red-300 hover:bg-red-500/25 transition-colors"><X className="w-4 h-4" /></button>
                       )}
                       {!m.bye && editable && (m.status === "live" || m.status === "finished") && (
                         <div className="flex items-center gap-2 flex-wrap">
@@ -315,6 +322,7 @@ function CupTab({ tournament, onChange }) {
           </Section>
         );
       })}
+      <CancelMatchDialog open={!!cancelTarget} match={cancelTarget} mode="cup" onClose={() => setCancelTarget(null)} onDone={async () => { await load(); onChange(); }} />
     </div>
   );
 }
@@ -396,6 +404,7 @@ function FixtureTab({ tournament, onChange }) {
 function MatchesTab({ tournament }) {
   const [matches, setMatches] = useState([]);
   const [scores, setScores] = useState({});
+  const [cancelTarget, setCancelTarget] = useState(null);
 
   const load = () => api.get("/matches").then((r) => setMatches(r.data));
   useEffect(() => { load(); }, []);
@@ -441,7 +450,11 @@ function MatchesTab({ tournament }) {
                   <span className="font-heading font-bold">{m.away.abbreviation}</span>
                   {m.status === "live" && <span className="text-[10px] neon-text-green animate-pulse-glow ml-2">CANLI</span>}
                   {m.status === "finished" && <span className="text-sm ml-2">{m.home_score}-{m.away_score}</span>}
+                  {m.status === "canceled" && <span className="text-[10px] text-red-400 ml-2">İPTAL</span>}
                 </div>
+                {m.status === "canceled" ? (
+                  <div className="text-xs text-red-300/80 flex-1 min-w-[120px]">İptal edildi{m.cancel_reason ? ` · ${m.cancel_reason}` : ""}</div>
+                ) : (
                 <div className="flex items-center gap-2 flex-wrap">
                   <Input type="number" min={0} placeholder="0" defaultValue={m.home_score ?? ""} onChange={(e) => setScore(m.id, "home", e.target.value)} className="w-14 bg-white/5 border-white/15 h-9 text-center" data-testid={`score-home-${m.id}`} />
                   <span className="text-zinc-500">-</span>
@@ -458,24 +471,34 @@ function MatchesTab({ tournament }) {
                   {m.status === "scheduled" && (
                     <button onClick={() => finish(m)} className="rounded-full px-3 py-1.5 text-sm bg-white/10 border border-white/20" data-testid={`quickfinish-match-${m.id}`}>Skor Gir</button>
                   )}
+                  {m.status !== "finished" && (
+                    <button onClick={() => setCancelTarget(m)} data-testid={`cancel-match-${m.id}`} title="Maçı iptal et" className="rounded-full p-1.5 bg-red-500/15 border border-red-500/40 text-red-300 hover:bg-red-500/25 transition-colors"><X className="w-4 h-4" /></button>
+                  )}
                 </div>
+                )}
               </div>
             ))}
           </div>
         </Section>
       ))}
+      <CancelMatchDialog open={!!cancelTarget} match={cancelTarget} mode="league" onClose={() => setCancelTarget(null)} onDone={load} />
     </div>
   );
 }
 
 /* ---------------- Player Pool ---------------- */
 function PlayersTab() {
+  const confirm = useConfirm();
   const [players, setPlayers] = useState([]);
+  const [clubs, setClubs] = useState([]);
   const [q, setQ] = useState("");
   const [form, setForm] = useState({ name: "", surname: "", photo_url: "", value: "", club: "", club_logo_url: "" });
+  const [clubForm, setClubForm] = useState({ name: "", logo_url: "" });
 
   const load = () => api.get("/players", { params: { q } }).then((r) => setPlayers(r.data));
+  const loadClubs = () => api.get("/pool-clubs").then((r) => setClubs(r.data)).catch(() => {});
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [q]);
+  useEffect(() => { loadClubs(); }, []);
 
   const add = async () => {
     if (!form.name.trim()) return toast.error("Oyuncu adı gerekli");
@@ -488,16 +511,62 @@ function PlayersTab() {
   };
   const del = async (id) => { await api.delete(`/admin/players/${id}`); load(); };
 
+  const addClub = async () => {
+    if (!clubForm.name.trim()) return toast.error("Takım adı gerekli");
+    try {
+      await api.post("/admin/pool-clubs", { name: clubForm.name.trim(), logo_url: clubForm.logo_url });
+      toast.success("Takım listeye eklendi");
+      setClubForm({ name: "", logo_url: "" });
+      loadClubs();
+    } catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+  };
+  const delClub = async (c) => {
+    const ok = await confirm({ title: `${c.name} listeden silinsin mi?`, description: "Takım, oyuncu ekleme listesinden kaldırılacak.", confirmText: "Sil" });
+    if (!ok) return;
+    await api.delete(`/admin/pool-clubs/${c.id}`); loadClubs();
+  };
+
+  const pickClub = (id) => {
+    const c = clubs.find((x) => x.id === id);
+    setForm((f) => ({ ...f, club: c ? c.name : "", club_logo_url: c ? c.logo_url : "" }));
+  };
+  const selectedClubId = clubs.find((c) => c.name === form.club)?.id || "";
+
   return (
     <div className="space-y-6">
+      <Section title="Takım Ekle (Oyuncu Listesi)">
+        <p className="text-sm text-zinc-400 mb-3">Buraya eklediğiniz takımlar, oyuncu eklerken aşağıdaki "Takımı" listesinde otomatik görünür.</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[160px]"><span className="label-xs">Takım Adı</span><Input value={clubForm.name} onChange={(e) => setClubForm({ ...clubForm, name: e.target.value })} data-testid="club-name-input" className="mt-1 bg-white/5 border-white/15" placeholder="Örn. Galatasaray" /></div>
+          <ImageUpload value={clubForm.logo_url} onChange={(u) => setClubForm({ ...clubForm, logo_url: u })} label="Takım Logosu" round testid="club-logo" />
+          <button onClick={addClub} data-testid="add-club-btn" className="btn-primary rounded-full px-5 py-2.5 flex items-center gap-2"><Plus className="w-4 h-4" /> Takım Ekle</button>
+        </div>
+        {clubs.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-4" data-testid="club-list">
+            {clubs.map((c) => (
+              <span key={c.id} data-testid={`club-chip-${c.id}`} className="flex items-center gap-2 glass rounded-full pl-2 pr-1 py-1 text-sm">
+                {c.logo_url ? <img src={c.logo_url} alt="" className="w-5 h-5 rounded-full object-cover" /> : <span className="w-5 h-5 rounded-full bg-white/10" />}
+                {c.name}
+                <button onClick={() => delClub(c)} className="text-red-400 hover:text-red-300 p-0.5"><X className="w-3.5 h-3.5" /></button>
+              </span>
+            ))}
+          </div>
+        )}
+      </Section>
+
       <Section title="Havuza Oyuncu Ekle">
         <div className="grid sm:grid-cols-2 gap-3 max-w-2xl">
           <div><span className="label-xs">Ad</span><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="pool-name-input" className="mt-1 bg-white/5 border-white/15" /></div>
           <div><span className="label-xs">Soyad</span><Input value={form.surname} onChange={(e) => setForm({ ...form, surname: e.target.value })} data-testid="pool-surname-input" className="mt-1 bg-white/5 border-white/15" /></div>
           <div><span className="label-xs">Aktif Değer (M€)</span><Input type="number" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} data-testid="pool-value-input" className="mt-1 bg-white/5 border-white/15" /></div>
-          <div><span className="label-xs">Oynadığı Takım</span><Input value={form.club} onChange={(e) => setForm({ ...form, club: e.target.value })} data-testid="pool-club-input" className="mt-1 bg-white/5 border-white/15" /></div>
+          <div>
+            <span className="label-xs">Takımı</span>
+            <select value={selectedClubId} onChange={(e) => pickClub(e.target.value)} data-testid="pool-club-select" className="mt-1 w-full bg-white/5 border border-white/15 rounded-lg px-2 py-2 text-sm">
+              <option value="">Takım seç {clubs.length === 0 ? "(önce takım ekleyin)" : ""}</option>
+              {clubs.map((c) => <option key={c.id} value={c.id} className="bg-ink-800">{c.name}</option>)}
+            </select>
+          </div>
           <ImageUpload value={form.photo_url} onChange={(u) => setForm({ ...form, photo_url: u })} label="Oyuncu Fotoğrafı" round testid="pool-photo" />
-          <ImageUpload value={form.club_logo_url} onChange={(u) => setForm({ ...form, club_logo_url: u })} label="Takım Logosu" round testid="pool-club-logo" />
         </div>
         <button onClick={add} data-testid="add-pool-player-btn" className="btn-primary rounded-full px-6 py-2.5 flex items-center gap-2 mt-4"><Plus className="w-4 h-4" /> Havuza Ekle</button>
       </Section>
@@ -533,6 +602,8 @@ function MagazineTab() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [img, setImg] = useState("");
+  const [videoFile, setVideoFile] = useState("");
+  const [youtube, setYoutube] = useState("");
   const [highlight, setHighlight] = useState(false);
 
   const load = () => api.get("/magazine").then((r) => setItems(r.data));
@@ -540,18 +611,28 @@ function MagazineTab() {
 
   const add = async () => {
     if (!title.trim()) return toast.error("Başlık gerekli");
-    try { await api.post("/admin/magazine", { title, body, image_url: img, is_leader_highlight: highlight }); toast.success("Haber eklendi"); setTitle(""); setBody(""); setImg(""); setHighlight(false); load(); }
+    const video_url = youtube.trim() || videoFile;
+    try { await api.post("/admin/magazine", { title, body, image_url: img, video_url, is_leader_highlight: highlight }); toast.success("Haber eklendi"); setTitle(""); setBody(""); setImg(""); setVideoFile(""); setYoutube(""); setHighlight(false); load(); }
     catch (e) { toast.error(formatError(e.response?.data?.detail)); }
   };
   const del = async (id) => { await api.delete(`/admin/magazine/${id}`); load(); };
 
   return (
     <div className="space-y-6">
-      <Section title="Yeni Haber / Dedikodu">
+      <Section title="Yeni Haber / Dedikodu / Video">
         <div className="space-y-3 max-w-xl">
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Başlık" data-testid="magazine-title-input" className="bg-white/5 border-white/15" />
           <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Analiz / dedikodu..." className="bg-white/5 border-white/15" rows={3} />
           <ImageUpload value={img} onChange={setImg} label="Görsel (opsiyonel)" testid="magazine-image" />
+          <div className="rounded-2xl border border-white/10 p-3 space-y-3">
+            <span className="label-xs text-neon-blue">Video (opsiyonel) · röportaj vb.</span>
+            <VideoUpload value={videoFile} onChange={setVideoFile} label="Cihazdan Video Yükle" testid="magazine-video-upload" />
+            <div>
+              <span className="label-xs">veya YouTube Linki</span>
+              <Input value={youtube} onChange={(e) => setYoutube(e.target.value)} placeholder="https://youtu.be/..." data-testid="magazine-youtube-input" className="mt-1 bg-white/5 border-white/15" />
+            </div>
+            {(videoFile && youtube) && <p className="text-[11px] text-yellow-400">İki video girdiniz; YouTube linki önceliklidir.</p>}
+          </div>
           <label className="flex items-center gap-2 text-sm text-zinc-300"><input type="checkbox" checked={highlight} onChange={(e) => setHighlight(e.target.checked)} /> Lider takım vurgusu</label>
           <button onClick={add} data-testid="add-magazine-btn" className="btn-primary rounded-full px-6 py-2.5 flex items-center gap-2"><Plus className="w-4 h-4" /> Yayınla</button>
         </div>
@@ -560,8 +641,8 @@ function MagazineTab() {
         <div className="space-y-2">
           {items.map((it) => (
             <div key={it.id} className="flex items-center justify-between glass rounded-xl px-4 py-3">
-              <div><div className="font-semibold">{it.title}</div><div className="text-xs text-zinc-500 line-clamp-1">{it.body}</div></div>
-              <button onClick={() => del(it.id)} className="text-red-400"><Trash2 className="w-4 h-4" /></button>
+              <div className="flex items-center gap-2 min-w-0"><div className="min-w-0"><div className="font-semibold flex items-center gap-1.5">{it.video_url && <PlayCircle className="w-3.5 h-3.5 text-neon-blue shrink-0" />}{it.title}</div><div className="text-xs text-zinc-500 line-clamp-1">{it.body}</div></div></div>
+              <button onClick={() => del(it.id)} className="text-red-400 shrink-0"><Trash2 className="w-4 h-4" /></button>
             </div>
           ))}
           {items.length === 0 && <div className="text-zinc-500 text-sm">Henüz haber yok.</div>}

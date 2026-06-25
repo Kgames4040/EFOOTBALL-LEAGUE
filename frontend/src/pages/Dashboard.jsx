@@ -7,9 +7,10 @@ import { LeaderHighlight, MagazineFeed } from "../components/StatsWidgets";
 import { MagazineArchive } from "../components/MagazineArchive";
 import { ExpandableSection, StandingsPreview, FixturePreview } from "../components/HomeSections";
 import { CupBracket, CupSummaryModal } from "../components/CupBracket";
+import { FullscreenModal } from "../components/FullscreenModal";
 import { useAuth } from "../context/AuthContext";
 import api from "../lib/api";
-import { Trophy, PauseCircle, CalendarDays, Sparkles, ShieldHalf } from "lucide-react";
+import { Trophy, PauseCircle, CalendarDays, Sparkles, ShieldHalf, Maximize2 } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -23,6 +24,8 @@ export default function Dashboard() {
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [standingsFull, setStandingsFull] = useState(false);
+  const [fixtureFull, setFixtureFull] = useState(false);
 
   const load = async () => {
     try {
@@ -137,27 +140,37 @@ export default function Dashboard() {
 
       {/* Mobile: preview-first, tap to expand (vertical scroll, no horizontal overflow) */}
       <div className="lg:hidden space-y-6">
-        <ExpandableSection
-          icon={CalendarDays}
-          title="PUAN DURUMU"
-          hint="Tüm tablo"
-          testid="standings-section"
-          defaultOpen={false}
-          preview={<StandingsPreview rows={standings} />}
-        >
-          <StandingsTable rows={standings} />
-        </ExpandableSection>
+        <div>
+          <ExpandableSection
+            icon={CalendarDays}
+            title="PUAN DURUMU"
+            hint="Tüm tablo"
+            testid="standings-section"
+            defaultOpen={false}
+            preview={<StandingsPreview rows={standings} />}
+          >
+            <StandingsTable rows={standings} />
+          </ExpandableSection>
+          <button onClick={() => setStandingsFull(true)} data-testid="standings-fullscreen-btn-mobile" className="mt-2 w-full flex items-center justify-center gap-1.5 text-[11px] font-semibold neon-text-blue bg-neon-blue/10 border border-neon-blue/30 rounded-full px-3 py-2 hover:bg-neon-blue/20 transition-colors">
+            <Maximize2 className="w-3.5 h-3.5" /> Tam ekran için tıklayınız
+          </button>
+        </div>
 
-        <ExpandableSection
-          icon={CalendarDays}
-          title="FİKSTÜR"
-          hint="Tümü"
-          testid="fixture-section"
-          defaultOpen={false}
-          preview={<FixturePreview matches={matches} />}
-        >
-          <FixtureScroll matches={matches} vertical />
-        </ExpandableSection>
+        <div>
+          <ExpandableSection
+            icon={CalendarDays}
+            title="FİKSTÜR"
+            hint="Tümü"
+            testid="fixture-section"
+            defaultOpen={false}
+            preview={<FixturePreview matches={matches} />}
+          >
+            <FixtureScroll matches={matches} vertical />
+          </ExpandableSection>
+          <button onClick={() => setFixtureFull(true)} data-testid="fixture-fullscreen-btn-mobile" className="mt-2 w-full flex items-center justify-center gap-1.5 text-[11px] font-semibold neon-text-blue bg-neon-blue/10 border border-neon-blue/30 rounded-full px-3 py-2 hover:bg-neon-blue/20 transition-colors">
+            <Maximize2 className="w-3.5 h-3.5" /> Tam ekran için tıklayınız
+          </button>
+        </div>
 
         <LeaderHighlight leader={standings[0]} />
         <MagazineFeed
@@ -171,11 +184,17 @@ export default function Dashboard() {
       <div className="hidden lg:grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <section className="glass rounded-3xl p-5">
-            <h3 className="font-heading text-xl mb-4 flex items-center gap-2"><CalendarDays className="w-5 h-5 text-neon-blue" /> PUAN DURUMU</h3>
+            <div className="flex items-center justify-between mb-4 gap-2">
+              <h3 className="font-heading text-xl flex items-center gap-2"><CalendarDays className="w-5 h-5 text-neon-blue" /> PUAN DURUMU</h3>
+              <button onClick={() => setStandingsFull(true)} data-testid="standings-fullscreen-btn" className="flex items-center gap-1.5 text-[11px] font-semibold neon-text-blue bg-neon-blue/10 border border-neon-blue/30 rounded-full px-3 py-1.5 hover:bg-neon-blue/20 transition-colors"><Maximize2 className="w-3.5 h-3.5" /> Tam ekran</button>
+            </div>
             <StandingsTable rows={standings} />
           </section>
           <section className="glass rounded-3xl p-5">
-            <h3 className="font-heading text-xl mb-4">FİKSTÜR</h3>
+            <div className="flex items-center justify-between mb-4 gap-2">
+              <h3 className="font-heading text-xl">FİKSTÜR</h3>
+              <button onClick={() => setFixtureFull(true)} data-testid="fixture-fullscreen-btn" className="flex items-center gap-1.5 text-[11px] font-semibold neon-text-blue bg-neon-blue/10 border border-neon-blue/30 rounded-full px-3 py-1.5 hover:bg-neon-blue/20 transition-colors"><Maximize2 className="w-3.5 h-3.5" /> Tam ekran için tıklayınız</button>
+            </div>
             <FixtureScroll matches={matches} />
           </section>
         </div>
@@ -188,6 +207,13 @@ export default function Dashboard() {
           />
         </div>
       </div>
+
+      <FullscreenModal open={standingsFull} onClose={() => setStandingsFull(false)} title="Puan Durumu" icon={CalendarDays} testid="standings-fullscreen-modal">
+        <StandingsTable rows={standings} />
+      </FullscreenModal>
+      <FullscreenModal open={fixtureFull} onClose={() => setFixtureFull(false)} title="Fikstür" icon={CalendarDays} testid="fixture-fullscreen-modal">
+        <FixtureScroll matches={matches} vertical />
+      </FullscreenModal>
 
       <MagazineArchive open={archiveOpen} onClose={() => setArchiveOpen(false)} items={magazine} initial={selected} />
     </Layout>

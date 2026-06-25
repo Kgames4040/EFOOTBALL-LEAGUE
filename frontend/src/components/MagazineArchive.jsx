@@ -1,6 +1,7 @@
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Newspaper } from "lucide-react";
+import { VideoPlayer } from "./VideoPlayer";
 
 export function MagazineArchive({ open, onClose, items, initial }) {
   return (
@@ -13,7 +14,11 @@ export function MagazineArchive({ open, onClose, items, initial }) {
           {(!items || items.length === 0) && <div className="text-sm text-zinc-500">Henüz haber yok.</div>}
           {(items || []).map((it) => (
             <div key={it.id} data-testid={`magazine-archive-item-${it.id}`} className={`glass rounded-2xl p-4 ${initial && initial.id === it.id ? "neon-border-green" : ""}`}>
-              {it.image_url && <img src={it.image_url} alt="" className="w-full h-40 object-cover rounded-xl mb-3" />}
+              {it.video_url ? (
+                <div className="mb-3"><VideoPlayer url={it.video_url} /></div>
+              ) : it.image_url ? (
+                <img src={it.image_url} alt="" className="w-full h-40 object-cover rounded-xl mb-3" />
+              ) : null}
               <div className="flex items-center gap-2">
                 {it.is_leader_highlight && <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">LİDER</span>}
                 <div className="font-semibold">{it.title}</div>

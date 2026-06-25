@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import html2canvas from "html2canvas";
 import api from "../lib/api";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
-import { Trophy, Crown, Download, Loader2, ChevronRight, Check, ShieldHalf } from "lucide-react";
+import { FullscreenModal } from "./FullscreenModal";
+import { Trophy, Crown, Download, Loader2, ChevronRight, Check, ShieldHalf, Maximize2 } from "lucide-react";
 
 function Logo({ t, size = 24 }) {
   const cls = `rounded-full object-cover border border-white/10 shrink-0`;
@@ -156,6 +157,7 @@ function BracketTree({ rounds, renderMatch, lineColor, labelClass = "text-zinc-3
 
 export function CupBracket({ bracket, onOpenSummary }) {
   const rounds = bracket?.rounds || [];
+  const [full, setFull] = useState(false);
 
   if (rounds.length === 0) {
     return (
@@ -167,7 +169,6 @@ export function CupBracket({ bracket, onOpenSummary }) {
     );
   }
 
-  const current = rounds[rounds.length - 1];
   const champion = bracket?.champion;
 
   return (
@@ -191,12 +192,18 @@ export function CupBracket({ bracket, onOpenSummary }) {
       )}
 
       <div className="glass rounded-3xl p-3 sm:p-4 min-w-0">
-        <div className="flex items-center justify-between mb-2 px-1">
+        <div className="flex items-center justify-between mb-2 px-1 gap-2">
           <span className="text-xs font-bold text-zinc-300 tracking-wide">EŞLEŞME AĞACI</span>
-          <span className="text-[10px] text-zinc-500">{current.complete ? "Güncel tur tamamlandı" : "Yana kaydırarak tüm turları görün →"}</span>
+          <button onClick={() => setFull(true)} data-testid="bracket-fullscreen-btn" className="flex items-center gap-1.5 text-[11px] font-semibold neon-text-blue bg-neon-blue/10 border border-neon-blue/30 rounded-full px-3 py-1.5 hover:bg-neon-blue/20 transition-colors">
+            <Maximize2 className="w-3.5 h-3.5" /> Tam ekran için tıklayın
+          </button>
         </div>
         <BracketTree rounds={rounds} lineColor="rgba(0,245,255,0.35)" labelClass="text-neon-blue" testid="cup-tree" renderMatch={(m, i) => <CupMatchCard m={m} index={i} compact />} />
       </div>
+
+      <FullscreenModal open={full} onClose={() => setFull(false)} title="Eşleşme Ağacı" testid="bracket-fullscreen-modal">
+        <BracketTree rounds={rounds} lineColor="rgba(0,245,255,0.35)" labelClass="text-neon-blue" testid="cup-tree-full" colWidth={220} renderMatch={(m, i) => <CupMatchCard m={m} index={i} />} />
+      </FullscreenModal>
     </div>
   );
 }

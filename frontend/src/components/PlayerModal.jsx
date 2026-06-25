@@ -10,6 +10,7 @@ export function PlayerModal({ open, onClose, slot, player, onSave, onRemove }) {
   const [name, setName] = useState("");
   const [photo, setPhoto] = useState("");
   const [value, setValue] = useState("");
+  const [locked, setLocked] = useState(false);
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -19,6 +20,7 @@ export function PlayerModal({ open, onClose, slot, player, onSave, onRemove }) {
       setName(player?.name || "");
       setPhoto(player?.photo_url || "");
       setValue(player?.value != null ? String(player.value) : "");
+      setLocked(false);
       setQ("");
       setResults([]);
     }
@@ -41,6 +43,7 @@ export function PlayerModal({ open, onClose, slot, player, onSave, onRemove }) {
     setName(`${p.name} ${p.surname}`.trim());
     setPhoto(p.photo_url || "");
     setValue(String(p.value || 0));
+    setLocked(true);
     setQ("");
     setResults([]);
   };
@@ -85,12 +88,13 @@ export function PlayerModal({ open, onClose, slot, player, onSave, onRemove }) {
 
           <div>
             <span className="label-xs">Oyuncu Adı</span>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Örn. Lionel Messi" data-testid="player-name-input" className="mt-1 bg-white/5 border-white/15" />
+            <Input value={name} onChange={(e) => { setName(e.target.value); setLocked(false); }} placeholder="Örn. Lionel Messi" data-testid="player-name-input" className="mt-1 bg-white/5 border-white/15" />
           </div>
           <ImageUpload value={photo} onChange={setPhoto} label="Oyuncu Fotoğrafı (boş bırakılabilir)" round testid="player-photo" />
           <div>
-            <span className="label-xs">Piyasa Değeri (Milyon €)</span>
-            <Input type="number" step="0.1" min="0" value={value} onChange={(e) => setValue(e.target.value)} placeholder="örn. 80" data-testid="player-value-input" className="mt-1 bg-white/5 border-white/15" />
+            <span className="label-xs">Piyasa Değeri (Milyon €){locked && <span className="ml-1 text-[10px] text-neon-blue">· havuz değeri kilitli</span>}</span>
+            <Input type="number" step="0.1" min="0" value={value} onChange={(e) => setValue(e.target.value)} readOnly={locked} disabled={locked} placeholder="örn. 80" data-testid="player-value-input" className={`mt-1 bg-white/5 border-white/15 ${locked ? "opacity-60 cursor-not-allowed" : ""}`} />
+            {locked && <p className="text-[10px] text-zinc-500 mt-1">Bu oyuncu havuzdan seçildi; değeri kurucu belirledi ve değiştirilemez.</p>}
           </div>
           <div className="flex gap-2 pt-2">
             <button onClick={save} data-testid="player-save-btn" className="btn-primary flex-1 rounded-full py-2.5">Kaydet</button>

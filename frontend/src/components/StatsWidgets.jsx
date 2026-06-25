@@ -1,5 +1,5 @@
 import React from "react";
-import { Trophy, Target, Crown, Newspaper } from "lucide-react";
+import { Trophy, Target, Crown, Newspaper, PlayCircle } from "lucide-react";
 
 export function ScorerWidget({ title, items, icon: Icon, color }) {
   return (
@@ -67,8 +67,15 @@ export function MagazineFeed({ items, onOpenAll, onSelect }) {
       <div className="space-y-3">
         {(items || []).slice(0, 6).map((it) => (
           <button key={it.id} onClick={() => onSelect && onSelect(it)} data-testid={`magazine-item-${it.id}`} className="block w-full text-left border-l-2 border-neon-blue/40 pl-3 hover:border-neon-blue transition-colors">
-            {it.image_url && <img src={it.image_url} alt="" className="w-full h-24 object-cover rounded-lg mb-2" />}
-            <div className="font-semibold text-sm">{it.title}</div>
+            {it.video_url ? (
+              <div className="relative w-full h-24 rounded-lg mb-2 overflow-hidden bg-black/40 flex items-center justify-center">
+                {it.image_url && <img src={it.image_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-60" />}
+                <PlayCircle className="relative w-8 h-8 text-white drop-shadow" />
+              </div>
+            ) : it.image_url ? (
+              <img src={it.image_url} alt="" className="w-full h-24 object-cover rounded-lg mb-2" />
+            ) : null}
+            <div className="font-semibold text-sm flex items-center gap-1.5">{it.video_url && <PlayCircle className="w-3.5 h-3.5 text-neon-blue shrink-0" />}{it.title}</div>
             {it.body && <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed line-clamp-2">{it.body}</p>}
           </button>
         ))}
