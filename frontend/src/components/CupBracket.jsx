@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import html2canvas from "html2canvas";
 import api from "../lib/api";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
@@ -45,15 +46,18 @@ function TeamLine({ t, score, win, pen, tbd }) {
 }
 
 function CupMatchCard({ m, index, compact }) {
+  const navigate = useNavigate();
   const homeWin = m.winner_team_id && m.home && m.winner_team_id === m.home.id;
   const awayWin = m.winner_team_id && m.away && m.winner_team_id === m.away.id;
   const penH = m.pen_winner_team_id && m.home && m.pen_winner_team_id === m.home.id;
   const penA = m.pen_winner_team_id && m.away && m.pen_winner_team_id === m.away.id;
   const live = m.status === "live" && !m.winner_team_id;
+  const clickable = !m.bye;
   return (
     <div
       data-testid={`cup-match-${m.id}`}
-      className={`relative glass rounded-2xl border transition-all ${compact ? "px-2.5 py-1.5" : "px-3 py-2.5"} ${
+      onClick={() => clickable && navigate(`/match/${m.id}`)}
+      className={`relative glass rounded-2xl border transition-all ${compact ? "px-2.5 py-1.5" : "px-3 py-2.5"} ${clickable ? "cursor-pointer hover:bg-white/5" : ""} ${
         live ? "border-neon-green/40" : m.winner_team_id ? "border-white/10" : "border-white/5"
       }`}
     >
@@ -70,14 +74,14 @@ function CupMatchCard({ m, index, compact }) {
           <span className="text-[10px] text-zinc-600 font-semibold">BEKLİYOR</span>
         )}
       </div>
-      <TeamLine t={m.home} score={m.bye ? null : m.home_score} win={homeWin} pen={penH} />
+      <TeamLine t={m.home} score={m.bye ? null : (live ? m.live_home : m.home_score)} win={homeWin} pen={penH} />
       <div className="h-px bg-white/5 my-0.5" />
       {m.bye ? (
         <div className="flex items-center gap-1.5 py-1 px-1 text-[11px] neon-text-green font-semibold">
           <ChevronRight className="w-3.5 h-3.5" /> Tur atladı
         </div>
       ) : (
-        <TeamLine t={m.away} score={m.away_score} win={awayWin} pen={penA} tbd={!m.away} />
+        <TeamLine t={m.away} score={live ? m.live_away : m.away_score} win={awayWin} pen={penA} tbd={!m.away} />
       )}
     </div>
   );

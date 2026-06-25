@@ -471,6 +471,9 @@ async def build_match_view(m: dict):
         "away_score": m.get("away_score"),
         "scheduled_time": m.get("scheduled_time", ""),
         "status": m.get("status", "scheduled"),
+        "live_state": m.get("live_state", "scheduled"),
+        "live_home": m.get("live_home", 0),
+        "live_away": m.get("live_away", 0),
         "finished_at": m.get("finished_at"),
     }
 
@@ -716,6 +719,9 @@ async def build_cup_match_view(m):
         "pen_winner_team_id": m.get("pen_winner_team_id"),
         "bye": m.get("bye", False),
         "status": m.get("status", "scheduled"),
+        "live_state": m.get("live_state", "scheduled"),
+        "live_home": m.get("live_home", 0),
+        "live_away": m.get("live_away", 0),
     }
 
 
@@ -865,6 +871,220 @@ async def cup_set_result(match_id: str, req: CupResultReq, admin: dict = Depends
         await broadcast_push("🏁 Maç Bitti!", f"{home['name']} {hs} - {as_} {away['name'] if away else '?'}{pen}", "/")
     await maybe_advance_round(m["tournament_id"], m["round"])
     return {"ok": True, "winner_team_id": winner}
+
+
+# ----------------------------- Live match system -----------------------------
+HALF_REAL_SEC = 300      # 5 gerçek dk = 45 görüntü dk
+BREAK_SEC = 90           # devre arası 1.5 dk
+LIVE_CONSTS = {"half_real_sec": HALF_REAL_SEC, "break_sec": BREAK_SEC, "disp_per_half": 45}
+
+
+class GoalReq(BaseModel):
+    team_id: str
+
+
+class LiveFinishReq(BaseModel):
+    pen_winner_team_id: Optional[str] = None
+
+
+async def check_match_access(match_id: str, user: dict):
+    if user.get("role") == "founder":
+        return
+    if user.get("role") == "admin" and user.get("assigned_match_id") == match_id:
+        return
+    raise HTTPException(403, "Bu maç için yetkiniz yok")
+
+
+async def get_match_or_404(match_id: str):
+    m = await db.matches.find_one({"id": match_id})
+    if not m:
+        raise HTTPException(404, "Maç bulunamadı")
+    return m
+
+
+async def get_last5(team_id: str):
+    cur = db.matches.find(
+        {"status": "finished", "home_score": {"$ne": None},
+         "$or": [{"home_team_id": team_id}, {"away_team_id": team_id}]},
+        {"_id": 0, "home_team_id": 1, "away_team_id": 1, "home_score": 1, "away_score": 1, "finished_at": 1},
+    )
+    ms = await cur.to_list(1000)
+    ms.sort(key=lambda x: x.get("finished_at") or "", reverse=True)
+    seq = []
+    for m in ms[:5]:
+        if m["home_team_id"] == team_id:
+            gf, ga = m["home_score"], m["away_score"]
+        else:
+            gf, ga = m["away_score"], m["home_score"]
+        seq.append("W" if gf > ga else ("D" if gf == ga else "L"))
+    return seq
+
+
+async def push_match(match_id: str, m: dict, title: str, body: str):
+    await broadcast_push(title, body, f"/match/{match_id}")
+
+
+def score_line(home, away, m):
+    return f"{home['name']} {m.get('live_home', 0)} - {m.get('live_away', 0)} {away['name'] if away else '?'}"
+
+
+@api.get("/matches/{match_id}/detail")
+async def match_detail(match_id: str, user: dict = Depends(get_current_user)):
+    m = await get_match_or_404(match_id)
+    home = await db.teams.find_one({"id": m["home_team_id"]}, {"_id": 0})
+    away = await db.teams.find_one({"id": m.get("away_team_id")}, {"_id": 0}) if m.get("away_team_id") else None
+
+    def team_pub(t):
+        if not t:
+            return None
+        return {
+            "id": t["id"], "name": t.get("name"), "abbreviation": t.get("abbreviation"),
+            "logo_url": t.get("logo_url", ""), "manager": t.get("manager") or {},
+        }
+
+    can_manage = user.get("role") == "founder" or (user.get("role") == "admin" and user.get("assigned_match_id") == match_id)
+    return {
+        "id": m["id"],
+        "mode": m.get("mode", "league"),
+        "week": m.get("week"),
+        "round": m.get("round"),
+        "label": cup_round_label(0) if False else None,
+        "status": m.get("status", "scheduled"),
+        "live_state": m.get("live_state", "scheduled"),
+        "home": team_pub(home),
+        "away": team_pub(away),
+        "home_last5": await get_last5(m["home_team_id"]),
+        "away_last5": await get_last5(m["away_team_id"]) if m.get("away_team_id") else [],
+        "home_score": m.get("home_score"),
+        "away_score": m.get("away_score"),
+        "live_home": m.get("live_home", 0),
+        "live_away": m.get("live_away", 0),
+        "fh_start": m.get("fh_start"),
+        "fh_injury": m.get("fh_injury", 0),
+        "sh_start": m.get("sh_start"),
+        "sh_injury": m.get("sh_injury", 0),
+        "sh_eligible_at": m.get("sh_eligible_at"),
+        "goal_events": m.get("goal_events", []),
+        "winner_team_id": m.get("winner_team_id"),
+        "bye": m.get("bye", False),
+        "consts": LIVE_CONSTS,
+        "can_manage": can_manage,
+        "scheduled_time": m.get("scheduled_time", ""),
+    }
+
+
+@api.post("/live/matches/{match_id}/start-first-half")
+async def live_start_first_half(match_id: str, user: dict = Depends(require_staff)):
+    await check_match_access(match_id, user)
+    await ensure_running()
+    m = await get_match_or_404(match_id)
+    if m.get("bye"):
+        raise HTTPException(400, "Bay maçı başlatılamaz")
+    if m.get("live_state") in ("first_half", "second_half"):
+        raise HTTPException(400, "Maç zaten oynanıyor")
+    home = await team_lite(m["home_team_id"]); away = await team_lite(m.get("away_team_id"))
+    await db.matches.update_one({"id": match_id}, {"$set": {
+        "status": "live", "live_state": "first_half", "fh_start": now_iso(),
+        "fh_injury": random.randint(1, 5), "live_home": 0, "live_away": 0,
+        "goal_events": [], "started_at": now_iso(),
+        "sh_start": None, "sh_injury": 0, "sh_eligible_at": None,
+    }})
+    await push_match(match_id, m, "🟢 Maç Başladı!", f"{home['name']} - {away['name'] if away else '?'}")
+    return {"ok": True}
+
+
+@api.post("/live/matches/{match_id}/end-first-half")
+async def live_end_first_half(match_id: str, user: dict = Depends(require_staff)):
+    await check_match_access(match_id, user)
+    m = await get_match_or_404(match_id)
+    if m.get("live_state") != "first_half":
+        raise HTTPException(400, "İlk yarı oynanmıyor")
+    from datetime import timedelta
+    eligible = (datetime.now(timezone.utc) + timedelta(seconds=BREAK_SEC)).isoformat()
+    await db.matches.update_one({"id": match_id}, {"$set": {"live_state": "halftime", "fh_end": now_iso(), "sh_eligible_at": eligible}})
+    m = await get_match_or_404(match_id)
+    home = await team_lite(m["home_team_id"]); away = await team_lite(m.get("away_team_id"))
+    await push_match(match_id, m, "⏸️ İLK YARI", score_line(home, away, m))
+    return {"ok": True}
+
+
+@api.post("/live/matches/{match_id}/start-second-half")
+async def live_start_second_half(match_id: str, user: dict = Depends(require_staff)):
+    await check_match_access(match_id, user)
+    m = await get_match_or_404(match_id)
+    if m.get("live_state") != "halftime":
+        raise HTTPException(400, "Devre arası değil")
+    await db.matches.update_one({"id": match_id}, {"$set": {"live_state": "second_half", "sh_start": now_iso(), "sh_injury": random.randint(1, 5)}})
+    return {"ok": True}
+
+
+@api.post("/live/matches/{match_id}/goal")
+async def live_goal(match_id: str, req: GoalReq, user: dict = Depends(require_staff)):
+    await check_match_access(match_id, user)
+    m = await get_match_or_404(match_id)
+    if m.get("live_state") not in ("first_half", "second_half"):
+        raise HTTPException(400, "Maç canlı değil")
+    if req.team_id not in (m["home_team_id"], m.get("away_team_id")):
+        raise HTTPException(400, "Bu maçta olmayan takım")
+    field = "live_home" if req.team_id == m["home_team_id"] else "live_away"
+    new_val = m.get(field, 0) + 1
+    event = {"team_id": req.team_id, "type": "goal", "ts": now_iso(), "state": m.get("live_state")}
+    await db.matches.update_one({"id": match_id}, {"$set": {field: new_val}, "$push": {"goal_events": event}})
+    m = await get_match_or_404(match_id)
+    home = await team_lite(m["home_team_id"]); away = await team_lite(m.get("away_team_id"))
+    scorer = home if req.team_id == m["home_team_id"] else away
+    await push_match(match_id, m, f"GOOOOL⚽ {scorer['name']}", score_line(home, away, m))
+    return {"ok": True, "live_home": m.get("live_home", 0), "live_away": m.get("live_away", 0)}
+
+
+@api.post("/live/matches/{match_id}/correct-goal")
+async def live_correct_goal(match_id: str, req: GoalReq, user: dict = Depends(require_staff)):
+    await check_match_access(match_id, user)
+    m = await get_match_or_404(match_id)
+    if req.team_id not in (m["home_team_id"], m.get("away_team_id")):
+        raise HTTPException(400, "Bu maçta olmayan takım")
+    # move last goal: subtract from the OTHER team, add to the correct (req.team_id) team
+    correct_field = "live_home" if req.team_id == m["home_team_id"] else "live_away"
+    wrong_field = "live_away" if correct_field == "live_home" else "live_home"
+    upd = {correct_field: m.get(correct_field, 0) + 1}
+    if m.get(wrong_field, 0) > 0:
+        upd[wrong_field] = m.get(wrong_field, 0) - 1
+    event = {"team_id": req.team_id, "type": "correction", "ts": now_iso(), "state": m.get("live_state")}
+    await db.matches.update_one({"id": match_id}, {"$set": upd, "$push": {"goal_events": event}})
+    m = await get_match_or_404(match_id)
+    home = await team_lite(m["home_team_id"]); away = await team_lite(m.get("away_team_id"))
+    scorer = home if req.team_id == m["home_team_id"] else away
+    await push_match(match_id, m, f"🔄 DÜZELTME · GOL: {scorer['name']}", score_line(home, away, m))
+    return {"ok": True, "live_home": m.get("live_home", 0), "live_away": m.get("live_away", 0)}
+
+
+@api.post("/live/matches/{match_id}/end-match")
+async def live_end_match(match_id: str, req: LiveFinishReq, user: dict = Depends(require_staff)):
+    await check_match_access(match_id, user)
+    await ensure_running()
+    m = await get_match_or_404(match_id)
+    if m.get("live_state") not in ("first_half", "halftime", "second_half"):
+        raise HTTPException(400, "Bitirilecek canlı maç yok")
+    hs, as_ = m.get("live_home", 0), m.get("live_away", 0)
+    is_cup = m.get("mode") == "cup"
+    update = {"status": "finished", "live_state": "finished", "home_score": hs, "away_score": as_, "finished_at": now_iso()}
+    if is_cup:
+        if hs == as_:
+            pw = req.pen_winner_team_id
+            if pw not in (m["home_team_id"], m.get("away_team_id")):
+                raise HTTPException(400, "Berabere bitti, penaltı galibini seçmelisiniz")
+            winner = pw
+            update["pen_winner_team_id"] = pw
+        else:
+            winner = m["home_team_id"] if hs > as_ else m["away_team_id"]
+        update["winner_team_id"] = winner
+    await db.matches.update_one({"id": match_id}, {"$set": update})
+    m2 = await get_match_or_404(match_id)
+    home = await team_lite(m2["home_team_id"]); away = await team_lite(m2.get("away_team_id"))
+    await push_match(match_id, m2, "🏁 MAÇ BİTTİ", f"{home['name']} {hs} - {as_} {away['name'] if away else '?'}")
+    if is_cup:
+        await maybe_advance_round(m["tournament_id"], m["round"])
+    return {"ok": True, "home_score": hs, "away_score": as_}
 
 
 # ----------------------------- Standings -----------------------------

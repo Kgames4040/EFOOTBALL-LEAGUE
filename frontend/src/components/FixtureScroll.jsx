@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 
 function TeamMini({ team, align = "left" }) {
   return (
@@ -14,12 +15,14 @@ function TeamMini({ team, align = "left" }) {
 }
 
 function MatchCard({ m }) {
+  const navigate = useNavigate();
   const finished = m.status === "finished";
   const live = m.status === "live";
   return (
     <div
       data-testid={`fixture-match-${m.id}`}
-      className="glass rounded-xl px-3 py-2.5 w-[200px] shrink-0 hover:-translate-y-0.5 transition-transform"
+      onClick={() => navigate(`/match/${m.id}`)}
+      className="glass rounded-xl px-3 py-2.5 w-[200px] shrink-0 hover:-translate-y-0.5 transition-transform cursor-pointer"
     >
       <div className="flex items-center justify-between">
         <TeamMini team={m.home} />
@@ -29,7 +32,10 @@ function MatchCard({ m }) {
               {m.home_score}<span className="text-zinc-500"> - </span>{m.away_score}
             </div>
           ) : live ? (
-            <span className="text-[10px] font-bold neon-text-green animate-pulse-glow">CANLI</span>
+            <div>
+              <div className="font-heading font-extrabold text-base neon-text-green">{m.live_home ?? 0}<span className="text-zinc-500"> - </span>{m.live_away ?? 0}</div>
+              <span className="text-[9px] font-bold neon-text-green animate-pulse-glow">CANLI</span>
+            </div>
           ) : (
             <span className="text-xs text-zinc-400">{m.scheduled_time || "VS"}</span>
           )}
@@ -47,10 +53,11 @@ function MatchCard({ m }) {
 
 // Full-width row used in mobile previews and the vertical expanded view (no horizontal scroll).
 export function MatchRow({ m }) {
+  const navigate = useNavigate();
   const finished = m.status === "finished";
   const live = m.status === "live";
   return (
-    <div data-testid={`fixture-row-${m.id}`} className="flex items-center gap-2 glass rounded-xl px-3 py-2.5">
+    <div data-testid={`fixture-row-${m.id}`} onClick={() => navigate(`/match/${m.id}`)} className="flex items-center gap-2 glass rounded-xl px-3 py-2.5 cursor-pointer hover:bg-white/5 transition-colors">
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {m.home.logo_url ? (
           <img src={m.home.logo_url} alt="" className="w-6 h-6 rounded-full object-cover border border-white/10 shrink-0" />
@@ -63,7 +70,10 @@ export function MatchRow({ m }) {
         {finished ? (
           <div className="font-heading font-extrabold text-sm text-white">{m.home_score}<span className="text-zinc-500"> - </span>{m.away_score}</div>
         ) : live ? (
-          <span className="text-[10px] font-bold neon-text-green animate-pulse-glow">CANLI</span>
+          <div>
+            <div className="font-heading font-extrabold text-sm neon-text-green">{m.live_home ?? 0}<span className="text-zinc-500"> - </span>{m.live_away ?? 0}</div>
+            <span className="text-[9px] font-bold neon-text-green animate-pulse-glow">CANLI</span>
+          </div>
         ) : (
           <span className="text-[11px] text-zinc-400">{m.scheduled_time || "VS"}</span>
         )}

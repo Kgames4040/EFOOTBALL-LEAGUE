@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Layout } from "../components/Layout";
+import { useNavigate } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
@@ -865,6 +866,7 @@ function BrandingTab() {
 
 /* ---------------- Admin match panel (assigned admin) ---------------- */
 function AdminMatchPanel({ user, tournament }) {
+  const navigate = useNavigate();
   const matches = useAssignableMatches(tournament);
   const assigned = matches.find((m) => m.id === user?.assigned_match_id);
   return (
@@ -877,8 +879,11 @@ function AdminMatchPanel({ user, tournament }) {
       ) : (
         <div data-testid="admin-assigned-match">
           <h3 className="font-heading text-lg mb-2">Atanan Maçınız</h3>
-          <div className="glass rounded-2xl p-4 text-zinc-200">{assigned?.label || "Maç bilgisi yükleniyor…"}</div>
-          <p className="text-sm text-zinc-500 mt-4">Canlı kontroller (gol bildirimi, 1./2. yarı başlat-bitir) bir sonraki güncellemede bu panelde aktif olacak.</p>
+          <div className="glass rounded-2xl p-4 text-zinc-200 mb-4">{assigned?.label || "Maç bilgisi yükleniyor…"}</div>
+          <button onClick={() => navigate(`/match/${user.assigned_match_id}`)} data-testid="admin-manage-match-btn" className="btn-primary rounded-full px-6 py-2.5 flex items-center gap-2">
+            <PlayCircle className="w-4 h-4" /> Maçı Yönet (Canlı Takip)
+          </button>
+          <p className="text-sm text-zinc-500 mt-4">Bu maçta gol bildirimi, gol düzeltme ve 1./2. yarı başlat-bitir işlemlerini yapabilirsiniz.</p>
         </div>
       )}
     </Section>

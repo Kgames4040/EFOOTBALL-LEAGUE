@@ -9,6 +9,7 @@ import MyTeam from "@/pages/MyTeam";
 import Teams from "@/pages/Teams";
 import TeamDetail from "@/pages/TeamDetail";
 import Admin from "@/pages/Admin";
+import MatchTracking from "@/pages/MatchTracking";
 import { Loader2 } from "lucide-react";
 
 function Loading() {
@@ -50,6 +51,7 @@ function App() {
               <Route path="/my-team" element={<Protected><MyTeam /></Protected>} />
               <Route path="/teams" element={<Protected><Teams /></Protected>} />
               <Route path="/teams/:id" element={<Protected><TeamDetail /></Protected>} />
+              <Route path="/match/:id" element={<Protected><MatchTracking /></Protected>} />
               <Route path="/admin" element={<Protected adminOnly><Admin /></Protected>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

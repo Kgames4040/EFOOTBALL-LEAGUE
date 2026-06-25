@@ -1,0 +1,35 @@
+{
+  "summary": "Phase 3 live match system end-to-end testing PASSED (backend + UI + permission gating). All 6 review-request acceptance items verified. Backend pytest (7/7 pass) covers /matches/{id}/detail (can_manage logic for founder vs assigned-admin vs other), full live flow (start-1h → goal → correct-goal → end-1h → start-2h → goal → end-match) with persistence verification, and 403 enforcement for admin on unassigned matches. Frontend Playwright covers: (1) pre-match view (match-tracking-card, match-home, match-away, match-home-form, match-away-form, match-controls, ctrl-start-1h all visible); (2) full founder live flow on SahinlerX vs Kurtlar — start-1h made live-badge '● CANLI' and match-clock appear, goal/home → 1-0 with match-scorers chip, ctrl-correct → away → 0-1, end-1h → ctrl-start-2h shown, start-2h → goal/home → 1-1, ctrl-end-match → confirm-dialog → confirm-accept-btn → 'MAÇ SONU' badge with final score 1-1, and GET /matches/{id}/detail confirmed status=finished home_score=1 away_score=1; (3) dashboard live score: started NEC vs ASL via API + scored 1 goal, fixture-row-{id} on dashboard correctly shows '1 - 0' with 'CANLI' label; (4) admin restriction: seed_Sahinler/pass1234 sees admin-assigned-match + admin-manage-match-btn on /admin, navigating to assigned match 6953d801... shows match-controls (can_manage=true), opening a different match (deec403b...) hides match-controls (count=0); (5) finished view at /match/a9e766a1... shows 'MAÇ SONU' + final score 3-0 with zero live-badge instances. Cup match clickability skipped per request (league-only).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Pre-match view", "issues": ["match-score testid is not rendered before match is live (only appears once first half starts). Acceptable per design — score block is hidden pre-match — but if main agent wants the testid to exist unconditionally as 0-0 placeholder for tests, consider rendering it always."]},
+      {"screen": "Dialogs", "issues": ["Pre-existing low-priority Radix 'Missing DialogDescription/aria-describedby' warnings still emitted (carried from iteration_4/5). Affects confirm-dialog and pick-team-dialog as well."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_live_match.py",
+    "/app/test_reports/pytest/phase3_live.xml"
+  ],
+  "action_items": [
+    "(LOW) Optional: render match-score testid unconditionally (e.g. as '0-0' pre-match) so UI tests can assert it pre-kickoff without conditional logic.",
+    "(LOW / a11y carry-over) Add DialogDescription / aria-describedby to confirm-dialog and pick-team-dialog DialogContent."
+  ],
+  "critical_code_review_comments": [
+    "check_match_access correctly gates founder vs admin.assigned_match_id; verified 403 returned for admin on non-assigned match. require_staff dependency chain works (admin role accepted).",
+    "GET /matches/{id}/detail returns the right shape with consts (half_real_sec=300, break_sec=90, disp_per_half=45) which the frontend uses to compute the displayed clock — verified working in browser.",
+    "live_end_match correctly writes status=finished, live_state=finished, home_score=live_home, away_score=live_away — persistence verified end-to-end (browser → API).",
+    "ed027c3e... match got finished 1-1 during the founder test and is reflected on the dashboard standings/fixture views correctly. State left as-is per the review-request note.",
+    "Minor: server.py is now ~1460 lines; consider splitting live/match/cup/auth routers into separate files for maintainability (no functional impact)."
+  ],
+  "updated_files": ["/app/backend/tests/test_live_match.py"],
+  "success_rate": {"backend": "100% (7/7 pytest)", "frontend": "100% (all 6 review-request acceptance items)"},
+  "test_credentials": "Founder neco/neco404 ✓, Admin seed_Sahinler/pass1234 (assigned to 6953d801-a87f-440c-9a7c-5c928d777be7) ✓",
+  "seed_data_creation": "None. State mutations during testing (acceptable per review-request): match ed027c3e (SahinlerX vs Kurtlar) finished 1-1 via founder live flow; match 5785c462 (NECO FC vs Aslanlar) started live with 1 home goal then left live; finished match a9e766a1 (3-0) untouched; admin assigned match 6953d801 untouched (only viewed).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 3 live match system fully verified. Active tournament 'Test Ligi' fixture is partially mutated (some matches finished, one left live) — that's per design. Admin assignment for seed_Sahinler -> 6953d801-a87f-440c-9a7c-5c928d777be7 still intact. Finished demo match a9e766a1 (3-0) still in place. Key testids confirmed: match-tracking-card, match-home, match-away, match-home-form, match-away-form, match-score (live only), match-clock, live-badge, match-controls, ctrl-start-1h, ctrl-end-1h, ctrl-start-2h, ctrl-end-match, ctrl-goal, ctrl-correct, pick-team-dialog, pick-team-{teamId}, match-scorers, admin-assigned-match, admin-manage-match-btn, fixture-row-{id}, confirm-dialog, confirm-accept-btn.",
+  "rca of the issue": "No issues found. All Phase 3 acceptance criteria PASS."
+}
