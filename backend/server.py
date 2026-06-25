@@ -145,7 +145,23 @@ class MagazineReq(BaseModel):
     title: str
     body: str = ""
     image_url: str = ""
+    video_url: str = ""
     is_leader_highlight: bool = False
+
+
+class PoolClubReq(BaseModel):
+    name: str
+    logo_url: str = ""
+
+
+class CancelMatchReq(BaseModel):
+    reason: str = ""
+
+
+class CupCancelReq(BaseModel):
+    reason: str = ""
+    cup_action: str = "both_out"   # "both_out" | "advance"
+    advance_team_id: Optional[str] = None
 
 
 class SettingsReq(BaseModel):
@@ -667,40 +683,95 @@ def cup_match_doc(tid, round_no, slot, home, away):
 
 async def create_cup_round(tid, round_no, team_ids):
     teams = list(team_ids)
-    bye_team = None
-    if len(teams) % 2 == 1:
-        bye_team = teams.pop()  # leftover team advances automatically
+    n = len(teams)
+    if n <= 1:
+        await maybe_advance_round(tid, round_no)
+        return
     docs = []
     slot = 0
-    for i in range(0, len(teams), 2):
-        docs.append(cup_match_doc(tid, round_no, slot, teams[i], teams[i + 1]))
-        slot += 1
-    if bye_team is not None:
-        d = cup_match_doc(tid, round_no, slot, bye_team, None)
-        d.update({"status": "finished", "winner_team_id": bye_team, "bye": True, "finished_at": now_iso()})
-        docs.append(d)
+    if n % 2 == 0:
+        # normal knockout pairing
+        for i in range(0, n, 2):
+            docs.append(cup_match_doc(tid, round_no, slot, teams[i], teams[i + 1]))
+            slot += 1
+    else:
+        # ODD -> mini league (round-robin); top `advance` (largest power of 2 < n) advance
+        p = 1
+        while p * 2 < n:
+            p *= 2
+        advance = p
+        for i in range(n):
+            for j in range(i + 1, n):
+                d = cup_match_doc(tid, round_no, slot, teams[i], teams[j])
+                d["group_round"] = True
+                d["advance_count"] = advance
+                docs.append(d)
+                slot += 1
     if docs:
         await db.matches.insert_many(docs)
     await maybe_advance_round(tid, round_no)
+
+
+def group_standings_order(matches):
+    teams = set()
+    for m in matches:
+        teams.add(m["home_team_id"])
+        if m.get("away_team_id"):
+            teams.add(m.get("away_team_id"))
+    table = {t: {"P": 0, "GD": 0, "GF": 0} for t in teams}
+    for m in matches:
+        if m.get("status") != "finished" or m.get("home_score") is None:
+            continue
+        h, a = m["home_team_id"], m["away_team_id"]
+        hs, as_ = m["home_score"], m["away_score"]
+        table[h]["GF"] += hs; table[h]["GD"] += hs - as_
+        table[a]["GF"] += as_; table[a]["GD"] += as_ - hs
+        if hs > as_:
+            table[h]["P"] += 3
+        elif hs < as_:
+            table[a]["P"] += 3
+        else:
+            table[h]["P"] += 1; table[a]["P"] += 1
+    return sorted(teams, key=lambda t: (table[t]["P"], table[t]["GD"], table[t]["GF"]), reverse=True)
+
+
+async def _team_names(ids):
+    name_map = {tm["id"]: tm["name"] for tm in await db.teams.find({"id": {"$in": list(ids)}}, {"_id": 0, "id": 1, "name": 1}).to_list(500)}
+    return [name_map.get(i, "?") for i in ids]
 
 
 async def maybe_advance_round(tid, round_no):
     matches = await db.matches.find({"tournament_id": tid, "round": round_no, "mode": "cup"}).to_list(500)
     if not matches:
         return
-    if any(m.get("winner_team_id") is None for m in matches):
-        return  # round not complete yet
+    # round complete when every match is finished or canceled (bye is already finished)
+    if any(m.get("status") not in ("finished", "canceled") for m in matches):
+        return
     nxt = await db.matches.find_one({"tournament_id": tid, "round": round_no + 1, "mode": "cup"})
     if nxt:
-        return  # already advanced
+        return
+    is_group = any(m.get("group_round") for m in matches)
+    if is_group:
+        advance = matches[0].get("advance_count", 1)
+        order = group_standings_order(matches)
+        qualifiers = order[:advance]
+        names = await _team_names(qualifiers)
+        if len(qualifiers) <= 1:
+            await db.tournaments.update_one({"id": tid}, {"$set": {"champion_team_id": qualifiers[0] if qualifiers else None, "status": "finished"}})
+            if qualifiers:
+                await publish_magazine(tid, "🏆 Şampiyon", f"{names[0]} kupanın sahibi oldu! Tebrikler.")
+        else:
+            await publish_magazine(tid, f"{round_no}. Tur (Mini Lig) Sonucu", "Üst tura çıkanlar: " + ", ".join(names))
+            await create_cup_round(tid, round_no + 1, qualifiers)
+        return
     matches.sort(key=lambda x: x["slot_index"])
-    winners = [m["winner_team_id"] for m in matches]
-    name_map = {tm["id"]: tm["name"] for tm in await db.teams.find({"id": {"$in": winners}}, {"_id": 0, "id": 1, "name": 1}).to_list(500)}
-    names = [name_map.get(w, "?") for w in winners]
+    winners = [m["winner_team_id"] for m in matches if m.get("winner_team_id")]
+    names = await _team_names(winners)
     if len(winners) == 1:
-        champ = winners[0]
-        await db.tournaments.update_one({"id": tid}, {"$set": {"champion_team_id": champ, "status": "finished"}})
+        await db.tournaments.update_one({"id": tid}, {"$set": {"champion_team_id": winners[0], "status": "finished"}})
         await publish_magazine(tid, "🏆 Şampiyon", f"{names[0]} kupanın sahibi oldu! Tebrikler.")
+    elif len(winners) == 0:
+        await publish_magazine(tid, f"{round_no}. Tur", "Tüm maçlar iptal edildi, ilerleyen takım yok.")
     else:
         await publish_magazine(tid, f"{round_no}. Tur Atlayanları", "Tur atlayan takımlar: " + ", ".join(names))
         await create_cup_round(tid, round_no + 1, winners)
@@ -1179,20 +1250,21 @@ async def get_magazine():
     return items
 
 
-async def publish_magazine(tournament_id, title, body="", image_url="", is_leader_highlight=False, push=True):
+async def publish_magazine(tournament_id, title, body="", image_url="", is_leader_highlight=False, push=True, video_url="", url="/"):
     doc = {
         "id": new_id(),
         "tournament_id": tournament_id,
         "title": title,
         "body": body,
         "image_url": image_url,
+        "video_url": video_url,
         "is_leader_highlight": is_leader_highlight,
         "created_at": now_iso(),
     }
     await db.magazine.insert_one(dict(doc))
     doc.pop("_id", None)
     if push:
-        await broadcast_push(f"📰 {title}", (body or "")[:140] or "Yeni haber yayınlandı", "/")
+        await broadcast_push(f"📰 {title}", (body or "")[:140] or "Yeni haber yayınlandı", url)
     return doc
 
 
@@ -1200,7 +1272,7 @@ async def publish_magazine(tournament_id, title, body="", image_url="", is_leade
 async def add_magazine(req: MagazineReq, admin: dict = Depends(require_founder)):
     t = await active_tournament()
     return await publish_magazine(
-        t["id"] if t else None, req.title, req.body, req.image_url, req.is_leader_highlight
+        t["id"] if t else None, req.title, req.body, req.image_url, req.is_leader_highlight, video_url=req.video_url
     )
 
 
@@ -1230,6 +1302,32 @@ async def update_pool_player(player_id: str, req: PoolPlayerReq, admin: dict = D
 @api.delete("/admin/players/{player_id}")
 async def delete_pool_player(player_id: str, admin: dict = Depends(require_founder)):
     await db.player_pool.delete_one({"id": player_id})
+    return {"deleted": True}
+
+
+# ----------------------------- Pool clubs (founder-managed list box) -----------------------------
+@api.get("/pool-clubs")
+async def list_pool_clubs():
+    return await db.pool_clubs.find({}, {"_id": 0}).sort("name", 1).to_list(500)
+
+
+@api.post("/admin/pool-clubs")
+async def add_pool_club(req: PoolClubReq, admin: dict = Depends(require_founder)):
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(400, "Takım adı gerekli")
+    existing = await db.pool_clubs.find_one({"name_lower": name.lower()})
+    if existing:
+        raise HTTPException(400, "Bu takım zaten listede")
+    doc = {"id": new_id(), "name": name, "name_lower": name.lower(), "logo_url": req.logo_url, "created_at": now_iso()}
+    await db.pool_clubs.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@api.delete("/admin/pool-clubs/{club_id}")
+async def delete_pool_club(club_id: str, admin: dict = Depends(require_founder)):
+    await db.pool_clubs.delete_one({"id": club_id})
     return {"deleted": True}
 
 
