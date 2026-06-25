@@ -49,6 +49,18 @@ Türkçe eFootball lig/kupa yönetim uygulaması. Final sürüm öncesi düzeltm
 - Saat: HALF_REAL_SEC=300 (45dk≈5 gerçek dk), uzatma random 1-5dk, mola 90sn. Dakika client-side hesaplanır.
 - Yetki: check_match_access (founder=her maç, admin=assigned_match_id), 403 korumalı. Deep-link: bildirimler /match/:id (sw.js client.navigate). Fikstür+kupa kartları tıklanır, dashboard canlı skor gösterir.
 
+## Faz 4 — Mini Lig + Maç İptali + Magazin Video + Oyuncu Havuzu (2026-06) ✅ backend test edildi (4/4)
+- Tek-sayı turda mini lig (round-robin): zaten backend'de vardı (create_cup_round / maybe_advance_round, advance_count = n'den küçük en büyük 2'nin kuvveti) — doğrulandı.
+- Maç iptali: Lig → POST /admin/matches/{id}/cancel {reason} (status=canceled, magazin "⛔ MAÇ İPTALİ home - away" + sebep, standings'te OM+1/M+1, 0 puan). Kupa → POST /admin/cup/match/{id}/cancel {reason, cup_action: both_out|advance, advance_team_id} (advance'de winner atanır + maybe_advance_round). Bay maçı iptali 400. build_match_view + build_cup_match_view'a cancel_reason eklendi.
+- Frontend: CancelMatchDialog (2 aşamalı: onay → sebep; kupada both_out/advance seçimi). MatchesTab + CupTab'a X butonu ve iptal görünümü.
+- Magazin video: video_url zaten destekliydi. Admin'e VideoUpload (Cloudinary /video/upload) + YouTube link girişi. VideoPlayer (YouTube iframe / native video) magazin arşivinde; MagazineFeed'de play rozeti.
+- Oyuncu havuzu: PlayersTab'a "Takım Ekle" (chip listesi, /pool-clubs) + oyuncu eklerken takım list-box (select). PlayerModal'da havuzdan seçilen oyuncunun değeri kilitli (readOnly).
+
+## Faz 1 — Tam Ekran Modalları (2026-06) ✅
+- FullscreenModal bileşeni. Kupa eşleşme ağacı, lig fikstürü ve puan durumu için "Tam ekran için tıklayınız" butonları (Dashboard masaüstü+mobil, CupBracket). Fikstür tam ekranda dikey kaydırmalı.
+
+## ⚠️ Önemli — .env dosyaları (2026-06)
+- GitHub checkout'unda backend/.env ve frontend/.env YOKTU (gitignore). Bu oturumda preview için yeniden oluşturuldu: backend (local MongoDB, Cloudinary kimlikleri deployment dokümanından, YENİ üretilmiş VAPID çifti), frontend (REACT_APP_BACKEND_URL = preview URL). Render'da bu env değişkenleri Dashboard'da ayarlanmalı.
+
 ## Kalan Fazlar
-- FAZ 4: Tek-sayı turda mini lig eşleştirme; maç iptali (X+sebep+magazin+puan/kupa kararı); magazin video (upload+YouTube); oyuncu havuzu takım list box + kilitli oyuncu değeri.
-- FAZ 1 (kalan): Bracket & fikstür & puan durumu "tam ekran için tıkla" modalları.
+- FAZ 2/3'ün kalan UI parçaları (canlı dakika ekranı detayları, bildirim deep-link → magazin, vb.) ana istek listesinde; bu oturum sadece FAZ 4 + FAZ 1 kapsamındaydı.
