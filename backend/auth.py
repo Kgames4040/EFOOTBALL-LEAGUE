@@ -59,6 +59,18 @@ async def get_current_user(request: Request) -> dict:
 
 
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Yetkiniz yok (sadece admin)")
+    if user.get("role") not in ("admin", "founder"):
+        raise HTTPException(status_code=403, detail="Yetkiniz yok")
+    return user
+
+
+async def require_founder(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("role") != "founder":
+        raise HTTPException(status_code=403, detail="Bu işlem yalnızca kurucuya açık")
+    return user
+
+
+async def require_staff(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("role") not in ("admin", "founder"):
+        raise HTTPException(status_code=403, detail="Yetkiniz yok")
     return user

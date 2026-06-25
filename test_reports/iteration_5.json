@@ -1,0 +1,28 @@
+{
+  "summary": "Phase-2 Founder/Admin role system end-to-end UI test. All 7 review-request acceptance criteria PASS. Founder login shows KURUCU badge, hamburger 'Kurucu Paneli' nav, admin page exposes admin-tab-roles + admin-tab-branding (plus existing tabs). Grant/Revoke flow works via roles-list (ADMIN tag appears, revoke goes through confirm-dialog/confirm-accept-btn). Branding save updates header app-name live (no reload) and persists. Founder UsersTab edit-team opens founder-team-edit-dialog prefilled; ft-save-btn triggers 'Takım güncellendi' toast and the change persists. profile-menu-btn -> profile-dialog -> profile-logout-btn redirects to /login. refresh-btn on /teams keeps user on /teams. Admin-role user (seed_Bogalar) sees ADMIN badge, no Takımım nav, /admin shows restricted admin-no-match panel, founder tabs are absent. Cleanup completed: admin revoked, branding restored to 'eFootball Lig', Sahinler team name restored.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dialogs (ConfirmDialog, founder-team-edit-dialog, profile-dialog, etc.)", "issues": ["Recurring Radix console warning: 'Missing Description or aria-describedby={undefined} for {DialogContent}'. Same low-priority a11y debt flagged in iteration_4. Add <DialogDescription> (or VisuallyHidden) to remaining Dialogs."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(LOW / a11y) Add DialogDescription/aria-describedby to ConfirmDialog, founder-team-edit-dialog, profile-dialog and any other DialogContent still missing it — Radix warnings still emitted during the role grant/revoke and team edit flows."
+  ],
+  "critical_code_review_comments": [
+    "Phase-2 implementation is solid: branding header updates live via AuthContext loadBranding (no reload); session persistence via cached_user behaves correctly (refresh-btn on /teams kept the user on /teams; reloads on /admin also stayed put). Founder vs Admin branch in Admin.jsx cleanly hides founder tabs from admin-role users and renders AdminMatchPanel with admin-no-match testid when no match is assigned. Layout.jsx correctly gates nav-myteam off for staff and shows KURUCU/ADMIN badges in profile-menu-btn. Backend /founder/* endpoints all guarded by require_founder.",
+    "Admin tab list is dynamic by tournament mode (league: tournament/fixture/matches/players/magazine/users/roles/branding/summary; cup: tournament/cup/players/magazine/users/roles/branding). Worth documenting in PRD/test_credentials so future testers don't expect 'fixtures'/'cup' testids unconditionally.",
+    "Minor: the assign-match select on the Roller tab currently shows only the placeholder option (no live league/cup matches available because Neon Kupası is finished). Grant still succeeds without a match (server stores null), and row shows 'Maç atanmadı' — functionally correct but UX-wise the select looks empty/disabled-like. Consider adding a hint when no eligible matches exist."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (sanity curl /branding, /founder/staff, /admin/users)", "frontend": "100% (all 7 review-request acceptance items)"},
+  "test_credentials": "neco/neco404 (founder) and seed_Bogalar/pass1234 (used as admin target then revoked) — both confirmed working.",
+  "seed_data_creation": "None. Temporary: granted admin to seed_Bogalar then REVOKED. Temporarily renamed Sahinler -> SahinlerX then restored to Sahinler. Branding temporarily set to 'Neon Lig' then restored to 'eFootball Lig'. Active cup 'Neon Kupası' was NOT touched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All Phase-2 founder/admin flows verified end-to-end. State is clean: branding='eFootball Lig', no staff/admins assigned, all seed teams intact. Completed cup 'Neon Kupası' (champion Sahinler) preserved. Tournament currently in 'league/none' mode so Admin tabs visible are: tournament, fixture, matches, players, magazine, users, roles, branding, summary. In cup mode the tabs are: tournament, cup, players, magazine, users, roles, branding. Radix DialogDescription a11y warnings still pending (low priority).",
+  "rca of the issue": "No new issues. Only pre-existing low-priority a11y warning about missing DialogDescription/aria-describedby on Radix DialogContent — fix is to add a <DialogDescription> (or sr-only VisuallyHidden description) to each Dialog that opens (ConfirmDialog, founder-team-edit-dialog, profile-dialog). Functional behaviour is unaffected."
+}

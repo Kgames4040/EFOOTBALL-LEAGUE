@@ -1,7 +1,6 @@
 import "@/App.css";
-import { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth, isStaff } from "@/context/AuthContext";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import Login from "@/pages/Login";
 import Onboarding from "@/pages/Onboarding";
@@ -25,7 +24,7 @@ function Protected({ children, adminOnly }) {
   const { user } = useAuth();
   if (user === null) return <Loading />;
   if (user === false) return <Navigate to="/login" replace />;
-  if (adminOnly && user.role !== "admin") return <Navigate to="/" replace />;
+  if (adminOnly && !isStaff(user.role)) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -33,35 +32,17 @@ function RootRoute() {
   const { user, team } = useAuth();
   if (user === null) return <Loading />;
   if (user === false) return <Navigate to="/login" replace />;
-  if (user.role !== "admin" && !team) return <Navigate to="/onboarding" replace />;
+  if (!isStaff(user.role) && !team) return <Navigate to="/onboarding" replace />;
   return <Dashboard />;
 }
 
-// On mobile, a hard page refresh should land the user on the home page.
-function MobileReloadRedirect() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  useEffect(() => {
-    try {
-      const nav = performance.getEntriesByType("navigation")[0];
-      const isReload = nav ? nav.type === "reload" : performance.navigation?.type === 1;
-      const isMobile = window.innerWidth < 1024;
-      if (isReload && isMobile && location.pathname !== "/" && location.pathname !== "/login") {
-        navigate("/", { replace: true });
-      }
-    } catch (e) { /* no-op */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return null;
-}
-
+// On mobile, a hard page refresh keeps the user on the current screen.
 function App() {
   return (
     <div className="App">
       <BrowserRouter>
         <AuthProvider>
           <ConfirmProvider>
-            <MobileReloadRedirect />
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/onboarding" element={<Protected><Onboarding /></Protected>} />

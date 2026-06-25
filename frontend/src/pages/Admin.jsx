@@ -4,17 +4,22 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs"
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { ImageUpload } from "../components/ImageUpload";
+import { CountrySelect } from "../components/CountrySelect";
+import { flagEmoji } from "../lib/countries";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { StandingsTable } from "../components/StandingsTable";
 import { useConfirm } from "../components/ConfirmProvider";
+import { useAuth } from "../context/AuthContext";
 import api, { formatError } from "../lib/api";
 import html2canvas from "html2canvas";
 import {
   Trophy, PlayCircle, PauseCircle, Trash2, Shuffle, Plus, Save, Download,
-  Flag, FlagOff, Pencil, X, Loader2, ShieldHalf,
+  Flag, FlagOff, Pencil, X, Loader2, ShieldHalf, UserCog, Palette, Shield, Crown,
 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Admin() {
+  const { user } = useAuth();
   const [tournament, setTournament] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey((k) => k + 1);
@@ -24,17 +29,30 @@ export default function Admin() {
   }, [refreshKey]);
 
   const isCup = tournament?.mode === "cup";
+  const isFounder = user?.role === "founder";
+
+  // Admin (match-assigned) sees only their match panel
+  if (user?.role === "admin") {
+    return (
+      <Layout>
+        <h1 className="font-heading font-extrabold text-2xl sm:text-3xl mb-6 flex items-center gap-2">
+          <Shield className="w-7 h-7 text-neon-blue" /> Admin Paneli
+        </h1>
+        <AdminMatchPanel user={user} tournament={tournament} />
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
       <h1 className="font-heading font-extrabold text-2xl sm:text-3xl mb-6 flex items-center gap-2">
-        <Trophy className="w-7 h-7 text-yellow-400" /> Admin Paneli
+        <Crown className="w-7 h-7 text-yellow-400" /> Kurucu Paneli
       </h1>
       <Tabs defaultValue="tournament">
         <TabsList className="glass rounded-full p-1 flex-wrap h-auto gap-1 mb-6">
           {(isCup
-            ? [["tournament", "Turnuva"], ["cup", "Kupa"], ["players", "Oyuncu Havuzu"], ["magazine", "Magazin"], ["users", "Kullanıcılar"]]
-            : [["tournament", "Turnuva"], ["fixture", "Fikstür"], ["matches", "Maçlar"], ["players", "Oyuncu Havuzu"], ["magazine", "Magazin"], ["users", "Kullanıcılar"], ["summary", "Günün Özeti"]]
+            ? [["tournament", "Turnuva"], ["cup", "Kupa"], ["players", "Oyuncu Havuzu"], ["magazine", "Magazin"], ["users", "Kullanıcılar"], ["roles", "Roller"], ["branding", "Marka"]]
+            : [["tournament", "Turnuva"], ["fixture", "Fikstür"], ["matches", "Maçlar"], ["players", "Oyuncu Havuzu"], ["magazine", "Magazin"], ["users", "Kullanıcılar"], ["roles", "Roller"], ["branding", "Marka"], ["summary", "Günün Özeti"]]
           ).map(([v, l]) => (
             <TabsTrigger key={v} value={v} data-testid={`admin-tab-${v}`} className="rounded-full data-[state=active]:btn-primary data-[state=active]:text-black text-sm px-4">{l}</TabsTrigger>
           ))}
@@ -53,6 +71,8 @@ export default function Admin() {
         <TabsContent value="players"><PlayersTab /></TabsContent>
         <TabsContent value="magazine"><MagazineTab /></TabsContent>
         <TabsContent value="users"><UsersTab /></TabsContent>
+        <TabsContent value="roles"><RolesTab tournament={tournament} /></TabsContent>
+        <TabsContent value="branding"><BrandingTab /></TabsContent>
       </Tabs>
     </Layout>
   );
@@ -554,10 +574,17 @@ function MagazineTab() {
 function UsersTab() {
   const confirm = useConfirm();
   const [users, setUsers] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [edit, setEdit] = useState({});
+  const [editTeam, setEditTeam] = useState(null);
 
-  const load = () => api.get("/admin/users").then((r) => setUsers(r.data));
+  const load = () => {
+    api.get("/admin/users").then((r) => setUsers(r.data));
+    api.get("/teams").then((r) => setTeams(r.data)).catch(() => {});
+  };
   useEffect(() => { load(); }, []);
+
+  const teamFor = (u) => teams.find((t) => t.id === u.team_id || t.name === u.team_name);
 
   const save = async (u) => {
     const e = edit[u.id] || {};
@@ -569,20 +596,80 @@ function UsersTab() {
   return (
     <Section title="Kullanıcı Yönetimi">
       <div className="space-y-2">
-        {users.map((u) => (
+        {users.map((u) => {
+          const t = teamFor(u);
+          return (
           <div key={u.id} data-testid={`user-row-${u.id}`} className="flex items-center gap-2 flex-wrap glass rounded-xl px-4 py-3">
             <div className="min-w-[140px]">
-              <div className="font-semibold flex items-center gap-2">{u.username} {u.role === "admin" && <span className="text-[10px] neon-text-blue">ADMIN</span>}</div>
+              <div className="font-semibold flex items-center gap-2">{u.username} {u.role === "admin" && <span className="text-[10px] neon-text-blue">ADMIN</span>}{u.role === "founder" && <span className="text-[10px] text-yellow-300">KURUCU</span>}</div>
               <div className="text-xs text-zinc-500">{u.team_name || "Takım yok"}</div>
             </div>
             <Input placeholder="Yeni kullanıcı adı" onChange={(e) => setEdit((s) => ({ ...s, [u.id]: { ...s[u.id], username: e.target.value } }))} className="bg-white/5 border-white/15 h-9 flex-1 min-w-[120px]" />
             <Input placeholder="Yeni şifre" onChange={(e) => setEdit((s) => ({ ...s, [u.id]: { ...s[u.id], password: e.target.value } }))} className="bg-white/5 border-white/15 h-9 flex-1 min-w-[120px]" />
             <button onClick={() => save(u)} data-testid={`save-user-${u.id}`} className="btn-primary rounded-full px-3 py-1.5 text-sm">Kaydet</button>
-            {u.role !== "admin" && <button onClick={() => del(u)} className="text-red-400 px-2"><Trash2 className="w-4 h-4" /></button>}
+            {t && <button onClick={() => setEditTeam(t)} data-testid={`edit-team-${u.id}`} className="rounded-full px-3 py-1.5 text-sm glass border border-white/15">Takımı Düzenle</button>}
+            {u.role !== "admin" && u.role !== "founder" && <button onClick={() => del(u)} className="text-red-400 px-2"><Trash2 className="w-4 h-4" /></button>}
           </div>
-        ))}
+          );
+        })}
       </div>
+      <FounderTeamEditDialog team={editTeam} onClose={() => setEditTeam(null)} onSaved={load} />
     </Section>
+  );
+}
+
+function FounderTeamEditDialog({ team, onClose, onSaved }) {
+  const [name, setName] = useState("");
+  const [abbr, setAbbr] = useState("");
+  const [logo, setLogo] = useState("");
+  const [desc, setDesc] = useState("");
+  const [m, setM] = useState({});
+  const [country, setCountry] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (team) {
+      setName(team.name || ""); setAbbr(team.abbreviation || ""); setLogo(team.logo_url || "");
+      setDesc(team.description || ""); setM(team.manager || {});
+      setCountry(team.manager?.nationality ? { name: team.manager.nationality } : null);
+    }
+  }, [team]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.put(`/admin/teams/${team.id}`, {
+        name, abbreviation: abbr, logo_url: logo, description: desc,
+        manager: { ...m, nationality: country?.name || m.nationality || "", flag: country?.code ? flagEmoji(country.code) : m.flag || "" },
+      });
+      toast.success("Takım güncellendi");
+      onSaved && onSaved();
+      onClose();
+    } catch (e) { toast.error(formatError(e.response?.data?.detail)); } finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open={!!team} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="glass-strong border-white/10 text-white sm:max-w-lg max-h-[88vh] overflow-y-auto thin-scroll" data-testid="founder-team-edit-dialog">
+        <DialogHeader><DialogTitle className="font-heading">Takımı Düzenle</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="flex gap-4">
+            <ImageUpload value={logo} onChange={setLogo} label="Logo" round testid="ft-logo" />
+            <ImageUpload value={m.photo_url} onChange={(u) => setM({ ...m, photo_url: u })} label="TD Foto" round testid="ft-mgr-photo" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><span className="label-xs">Takım Adı</span><Input value={name} onChange={(e) => setName(e.target.value)} data-testid="ft-team-name" className="mt-1 bg-white/5 border-white/15" /></div>
+            <div><span className="label-xs">Kısaltma</span><Input value={abbr} maxLength={3} onChange={(e) => setAbbr(e.target.value.toUpperCase().slice(0, 3))} className="mt-1 bg-white/5 border-white/15 uppercase" /></div>
+            <div><span className="label-xs">TD İsim</span><Input value={m.name || ""} onChange={(e) => setM({ ...m, name: e.target.value })} className="mt-1 bg-white/5 border-white/15" /></div>
+            <div><span className="label-xs">Ülke</span><div className="mt-1"><CountrySelect value={country?.name} onChange={setCountry} testid="ft-country" /></div></div>
+          </div>
+          <div><span className="label-xs">Açıklama</span><Textarea value={desc} onChange={(e) => setDesc(e.target.value)} className="mt-1 bg-white/5 border-white/15" rows={2} /></div>
+          <button onClick={save} disabled={saving} data-testid="ft-save-btn" className="btn-primary w-full rounded-full py-2.5 flex items-center justify-center gap-2 disabled:opacity-50">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Kaydet
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -646,5 +733,154 @@ function SummaryTab() {
         </div>
       )}
     </div>
+  );
+}
+
+
+/* ---------------- Roles (Kurucu) ---------------- */
+function teamLabel(t) { return t ? (t.name || t.abbreviation || "?") : "?"; }
+
+function useAssignableMatches(tournament) {
+  const [matches, setMatches] = useState([]);
+  useEffect(() => {
+    let cancel = false;
+    async function load() {
+      try {
+        if (!tournament) { setMatches([]); return; }
+        if (tournament.mode === "cup") {
+          const { data } = await api.get("/cup/bracket");
+          const flat = [];
+          (data.rounds || []).forEach((r) => r.matches.forEach((m) => {
+            if (!m.bye && m.home && m.away) flat.push({ id: m.id, label: `${r.label}: ${teamLabel(m.home)} - ${teamLabel(m.away)}` });
+          }));
+          if (!cancel) setMatches(flat);
+        } else {
+          const { data } = await api.get("/matches");
+          if (!cancel) setMatches((data || []).map((m) => ({ id: m.id, label: `H${m.week}: ${teamLabel(m.home)} - ${teamLabel(m.away)}` })));
+        }
+      } catch { if (!cancel) setMatches([]); }
+    }
+    load();
+    return () => { cancel = true; };
+  }, [tournament]);
+  return matches;
+}
+
+function RolesTab({ tournament }) {
+  const confirm = useConfirm();
+  const [users, setUsers] = useState([]);
+  const [sel, setSel] = useState({}); // userId -> matchId
+  const matches = useAssignableMatches(tournament);
+  const load = () => api.get("/admin/users").then((r) => setUsers(r.data.filter((u) => u.role !== "founder")));
+  useEffect(() => { load(); }, []);
+
+  const grant = async (u) => {
+    const matchId = sel[u.id] || "";
+    try {
+      await api.post(`/founder/users/${u.id}/grant-admin`, { match_id: matchId || null });
+      toast.success(`${u.username} artık admin`);
+      load();
+    } catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+  };
+  const revoke = async (u) => {
+    const ok = await confirm({ title: `${u.username} yetkisi alınsın mı?`, description: "Admin rolü kaldırılacak, atanan maç sıfırlanacak.", confirmText: "Yetkiyi Al" });
+    if (!ok) return;
+    try { await api.post(`/founder/users/${u.id}/revoke-admin`); toast.success("Yetki alındı"); load(); }
+    catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+  };
+
+  const matchName = (id) => matches.find((m) => m.id === id)?.label || (id ? "Atanmış maç" : "Maç atanmadı");
+
+  return (
+    <Section title="Admin Rolleri & Maç Atamaları">
+      <p className="text-sm text-zinc-400 mb-4">Bir kullanıcıyı admin yap, bir maça ata. Admin yalnızca o maçta gol bildirimi ve devre başlat/bitir yapabilir.</p>
+      <div className="space-y-2" data-testid="roles-list">
+        {users.length === 0 && <div className="text-zinc-500 text-sm">Kullanıcı yok.</div>}
+        {users.map((u) => (
+          <div key={u.id} className="glass rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center gap-3" data-testid={`role-row-${u.id}`}>
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold flex items-center gap-2">
+                {u.username}
+                {u.role === "admin" && <span className="px-2 py-0.5 rounded-full bg-neon-blue/15 border border-neon-blue/30 text-[10px] font-bold neon-text-blue">ADMIN</span>}
+              </div>
+              {u.role === "admin" && <div className="text-[11px] text-zinc-400 mt-0.5">Maç: {matchName(u.assigned_match_id)}</div>}
+            </div>
+            {u.role === "admin" ? (
+              <button onClick={() => revoke(u)} data-testid={`revoke-admin-${u.id}`} className="rounded-full px-4 py-2 bg-red-500/15 border border-red-500/40 text-red-200 text-sm hover:bg-red-500/25 transition-colors">Yetkiyi Al</button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <select value={sel[u.id] || ""} onChange={(e) => setSel((s) => ({ ...s, [u.id]: e.target.value }))} data-testid={`assign-match-${u.id}`} className="bg-ink-900 border border-white/15 rounded-lg px-2 py-2 text-sm max-w-[200px]">
+                  <option value="">Maç seç (opsiyonel)</option>
+                  {matches.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+                <button onClick={() => grant(u)} data-testid={`grant-admin-${u.id}`} className="btn-primary rounded-full px-4 py-2 text-sm whitespace-nowrap">Admin Yap</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+/* ---------------- Branding (Kurucu) ---------------- */
+function BrandingTab() {
+  const { loadBranding } = useAuth();
+  const [appName, setAppName] = useState("");
+  const [logo, setLogo] = useState("");
+  const [favicon, setFavicon] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get("/branding").then((r) => { setAppName(r.data.app_name || ""); setLogo(r.data.logo_url || ""); setFavicon(r.data.favicon_url || ""); });
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.put("/founder/branding", { app_name: appName, logo_url: logo, favicon_url: favicon });
+      await loadBranding();
+      toast.success("Marka ayarları kaydedildi");
+    } catch (e) { toast.error(formatError(e.response?.data?.detail)); } finally { setSaving(false); }
+  };
+
+  return (
+    <Section title="Marka & Görünüm">
+      <div className="space-y-5 max-w-lg">
+        <div>
+          <span className="label-xs">Uygulama Adı (sol üst yazı)</span>
+          <Input value={appName} onChange={(e) => setAppName(e.target.value)} data-testid="branding-app-name" className="mt-1 bg-white/5 border-white/15" placeholder="eFootball Lig" />
+        </div>
+        <div className="flex gap-6">
+          <ImageUpload value={logo} onChange={setLogo} label="Logo / Uygulama İkonu" round testid="branding-logo" />
+          <ImageUpload value={favicon} onChange={setFavicon} label="Favicon" round testid="branding-favicon" />
+        </div>
+        <button onClick={save} disabled={saving} data-testid="branding-save-btn" className="btn-primary rounded-full px-6 py-2.5 flex items-center gap-2 disabled:opacity-50">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Kaydet
+        </button>
+      </div>
+    </Section>
+  );
+}
+
+/* ---------------- Admin match panel (assigned admin) ---------------- */
+function AdminMatchPanel({ user, tournament }) {
+  const matches = useAssignableMatches(tournament);
+  const assigned = matches.find((m) => m.id === user?.assigned_match_id);
+  return (
+    <Section>
+      {!user?.assigned_match_id ? (
+        <div className="text-center py-10 text-zinc-400" data-testid="admin-no-match">
+          <Shield className="w-10 h-10 mx-auto mb-3 text-zinc-600" />
+          Henüz bir maça atanmadınız. Kurucu sizi bir maça atadığında burada görünecek.
+        </div>
+      ) : (
+        <div data-testid="admin-assigned-match">
+          <h3 className="font-heading text-lg mb-2">Atanan Maçınız</h3>
+          <div className="glass rounded-2xl p-4 text-zinc-200">{assigned?.label || "Maç bilgisi yükleniyor…"}</div>
+          <p className="text-sm text-zinc-500 mt-4">Canlı kontroller (gol bildirimi, 1./2. yarı başlat-bitir) bir sonraki güncellemede bu panelde aktif olacak.</p>
+        </div>
+      )}
+    </Section>
   );
 }

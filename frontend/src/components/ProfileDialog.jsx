@@ -7,11 +7,11 @@ import { CountrySelect } from "./CountrySelect";
 import { flagEmoji } from "../lib/countries";
 import { useAuth } from "../context/AuthContext";
 import api, { formatError } from "../lib/api";
-import { Loader2, User, Shield, Save, Eye, EyeOff } from "lucide-react";
+import { Loader2, User, Shield, Save, Eye, EyeOff, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 export function ProfileDialog({ open, onClose }) {
-  const { user, team, setUser, loadTeam, setTeam } = useAuth();
+  const { user, team, setUser, loadTeam, setTeam, logout } = useAuth();
   const [tab, setTab] = useState("account");
 
   // account
@@ -80,7 +80,9 @@ export function ProfileDialog({ open, onClose }) {
     } finally { setSavingTeam(false); }
   };
 
-  const hasTeam = !!team && user?.role !== "admin";
+  const hasTeam = !!team && user?.role !== "admin" && user?.role !== "founder";
+
+  const doLogout = () => { onClose(); logout(); };
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -136,6 +138,12 @@ export function ProfileDialog({ open, onClose }) {
             </button>
           </div>
         )}
+
+        <div className="pt-3 mt-1 border-t border-white/10">
+          <button onClick={doLogout} data-testid="profile-logout-btn" className="w-full rounded-full py-2.5 flex items-center justify-center gap-2 bg-red-500/15 border border-red-500/40 text-red-200 hover:bg-red-500/25 transition-colors">
+            <LogOut className="w-4 h-4" /> Çıkış Yap
+          </button>
+        </div>
       </DialogContent>
     </Dialog>
   );

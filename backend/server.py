@@ -22,6 +22,8 @@ from auth import (
     create_access_token,
     get_current_user,
     require_admin,
+    require_founder,
+    require_staff,
 )
 from media import generate_cloudinary_signature, broadcast_push
 
@@ -176,7 +178,7 @@ class PoolPlayerReq(BaseModel):
 
 # ----------------------------- Auth -----------------------------
 def public_user(u: dict) -> dict:
-    return {"id": u["id"], "username": u["username"], "role": u["role"], "team_id": u.get("team_id")}
+    return {"id": u["id"], "username": u["username"], "role": u["role"], "team_id": u.get("team_id"), "assigned_match_id": u.get("assigned_match_id")}
 
 
 @api.post("/auth/register")
@@ -261,7 +263,7 @@ async def read_settings():
 
 
 @api.put("/admin/settings")
-async def update_settings(req: SettingsReq, admin: dict = Depends(require_admin)):
+async def update_settings(req: SettingsReq, admin: dict = Depends(require_founder)):
     await db.settings.update_one({"id": "global"}, {"$set": {"max_budget": req.max_budget}}, upsert=True)
     return await get_settings()
 
@@ -385,7 +387,7 @@ async def read_active_tournament():
 
 
 @api.post("/admin/tournament")
-async def start_tournament(req: TournamentReq, admin: dict = Depends(require_admin)):
+async def start_tournament(req: TournamentReq, admin: dict = Depends(require_founder)):
     await db.tournaments.update_many({"active": True}, {"$set": {"active": False}})
     mode = "cup" if req.mode == "cup" else "league"
     t = {
@@ -405,7 +407,7 @@ async def start_tournament(req: TournamentReq, admin: dict = Depends(require_adm
 
 
 @api.post("/admin/tournament/pause")
-async def pause_tournament(admin: dict = Depends(require_admin)):
+async def pause_tournament(admin: dict = Depends(require_founder)):
     t = await active_tournament()
     if not t:
         raise HTTPException(404, "Aktif turnuva yok")
@@ -414,7 +416,7 @@ async def pause_tournament(admin: dict = Depends(require_admin)):
 
 
 @api.post("/admin/tournament/resume")
-async def resume_tournament(admin: dict = Depends(require_admin)):
+async def resume_tournament(admin: dict = Depends(require_founder)):
     t = await active_tournament()
     if not t:
         raise HTTPException(404, "Aktif turnuva yok")
@@ -423,7 +425,7 @@ async def resume_tournament(admin: dict = Depends(require_admin)):
 
 
 @api.delete("/admin/tournament")
-async def delete_tournament(admin: dict = Depends(require_admin)):
+async def delete_tournament(admin: dict = Depends(require_founder)):
     t = await active_tournament()
     if not t:
         raise HTTPException(404, "Aktif turnuva yok")
@@ -474,7 +476,7 @@ async def build_match_view(m: dict):
 
 
 @api.post("/admin/fixture/random")
-async def create_random_fixture(admin: dict = Depends(require_admin)):
+async def create_random_fixture(admin: dict = Depends(require_founder)):
     t = await active_tournament()
     if not t:
         raise HTTPException(404, "Önce turnuva başlatın")
@@ -511,7 +513,7 @@ async def create_random_fixture(admin: dict = Depends(require_admin)):
 
 
 @api.post("/admin/fixture/manual")
-async def create_manual_fixture(req: ManualFixtureReq, admin: dict = Depends(require_admin)):
+async def create_manual_fixture(req: ManualFixtureReq, admin: dict = Depends(require_founder)):
     t = await active_tournament()
     if not t:
         raise HTTPException(404, "Önce turnuva başlatın")
@@ -558,7 +560,7 @@ async def ensure_running():
 
 
 @api.post("/admin/matches/{match_id}/start")
-async def start_match(match_id: str, admin: dict = Depends(require_admin)):
+async def start_match(match_id: str, admin: dict = Depends(require_founder)):
     await ensure_running()
     m = await db.matches.find_one({"id": match_id})
     if not m:
@@ -574,7 +576,7 @@ async def start_match(match_id: str, admin: dict = Depends(require_admin)):
 
 
 @api.post("/admin/matches/{match_id}/finish")
-async def finish_match(match_id: str, req: FinishReq, admin: dict = Depends(require_admin)):
+async def finish_match(match_id: str, req: FinishReq, admin: dict = Depends(require_founder)):
     await ensure_running()
     m = await db.matches.find_one({"id": match_id})
     if not m:
@@ -598,7 +600,7 @@ async def finish_match(match_id: str, req: FinishReq, admin: dict = Depends(requ
 
 
 @api.put("/admin/matches/{match_id}")
-async def edit_match(match_id: str, req: MatchEditReq, admin: dict = Depends(require_admin)):
+async def edit_match(match_id: str, req: MatchEditReq, admin: dict = Depends(require_founder)):
     m = await db.matches.find_one({"id": match_id})
     if not m:
         raise HTTPException(404, "Maç bulunamadı")
@@ -776,7 +778,7 @@ async def cup_summary():
 
 
 @api.post("/admin/cup/draw")
-async def cup_draw(admin: dict = Depends(require_admin)):
+async def cup_draw(admin: dict = Depends(require_founder)):
     t = await active_tournament()
     if not t or t.get("mode") != "cup":
         raise HTTPException(400, "Aktif bir kupa yok")
@@ -792,7 +794,7 @@ async def cup_draw(admin: dict = Depends(require_admin)):
 
 
 @api.post("/admin/cup/reset")
-async def cup_reset(admin: dict = Depends(require_admin)):
+async def cup_reset(admin: dict = Depends(require_founder)):
     t = await active_tournament()
     if not t or t.get("mode") != "cup":
         raise HTTPException(400, "Aktif bir kupa yok")
@@ -802,7 +804,7 @@ async def cup_reset(admin: dict = Depends(require_admin)):
 
 
 @api.post("/admin/cup/match/{match_id}/start")
-async def cup_start_match(match_id: str, admin: dict = Depends(require_admin)):
+async def cup_start_match(match_id: str, admin: dict = Depends(require_founder)):
     await ensure_running()
     m = await db.matches.find_one({"id": match_id})
     if not m or m.get("mode") != "cup":
@@ -822,7 +824,7 @@ async def cup_start_match(match_id: str, admin: dict = Depends(require_admin)):
 
 
 @api.post("/admin/cup/match/{match_id}/result")
-async def cup_set_result(match_id: str, req: CupResultReq, admin: dict = Depends(require_admin)):
+async def cup_set_result(match_id: str, req: CupResultReq, admin: dict = Depends(require_founder)):
     await ensure_running()
     m = await db.matches.find_one({"id": match_id})
     if not m or m.get("mode") != "cup":
@@ -936,7 +938,7 @@ async def get_leaderboard():
 
 
 @api.put("/admin/leaderboard")
-async def set_leaderboard(req: LeaderboardReq, admin: dict = Depends(require_admin)):
+async def set_leaderboard(req: LeaderboardReq, admin: dict = Depends(require_founder)):
     t = await active_tournament()
     tid = t["id"] if t else None
     await db.leaderboard.delete_many({"tournament_id": tid})
@@ -975,7 +977,7 @@ async def publish_magazine(tournament_id, title, body="", image_url="", is_leade
 
 
 @api.post("/admin/magazine")
-async def add_magazine(req: MagazineReq, admin: dict = Depends(require_admin)):
+async def add_magazine(req: MagazineReq, admin: dict = Depends(require_founder)):
     t = await active_tournament()
     return await publish_magazine(
         t["id"] if t else None, req.title, req.body, req.image_url, req.is_leader_highlight
@@ -983,14 +985,14 @@ async def add_magazine(req: MagazineReq, admin: dict = Depends(require_admin)):
 
 
 @api.delete("/admin/magazine/{item_id}")
-async def delete_magazine(item_id: str, admin: dict = Depends(require_admin)):
+async def delete_magazine(item_id: str, admin: dict = Depends(require_founder)):
     await db.magazine.delete_one({"id": item_id})
     return {"deleted": True}
 
 
 # ----------------------------- Player Pool (admin-managed) -----------------------------
 @api.post("/admin/players")
-async def add_pool_player(req: PoolPlayerReq, admin: dict = Depends(require_admin)):
+async def add_pool_player(req: PoolPlayerReq, admin: dict = Depends(require_founder)):
     doc = {"id": new_id(), **req.model_dump(), "created_at": now_iso()}
     await db.player_pool.insert_one(dict(doc))
     doc.pop("_id", None)
@@ -998,7 +1000,7 @@ async def add_pool_player(req: PoolPlayerReq, admin: dict = Depends(require_admi
 
 
 @api.put("/admin/players/{player_id}")
-async def update_pool_player(player_id: str, req: PoolPlayerReq, admin: dict = Depends(require_admin)):
+async def update_pool_player(player_id: str, req: PoolPlayerReq, admin: dict = Depends(require_founder)):
     res = await db.player_pool.update_one({"id": player_id}, {"$set": req.model_dump()})
     if res.matched_count == 0:
         raise HTTPException(404, "Oyuncu bulunamadı")
@@ -1006,7 +1008,7 @@ async def update_pool_player(player_id: str, req: PoolPlayerReq, admin: dict = D
 
 
 @api.delete("/admin/players/{player_id}")
-async def delete_pool_player(player_id: str, admin: dict = Depends(require_admin)):
+async def delete_pool_player(player_id: str, admin: dict = Depends(require_founder)):
     await db.player_pool.delete_one({"id": player_id})
     return {"deleted": True}
 
@@ -1026,7 +1028,7 @@ async def search_pool_players(q: str = Query("", description="arama")):
 
 # ----------------------------- Admin user / team management -----------------------------
 @api.get("/admin/users")
-async def admin_list_users(admin: dict = Depends(require_admin)):
+async def admin_list_users(admin: dict = Depends(require_founder)):
     users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(500)
     for u in users:
         team = await db.teams.find_one({"user_id": u["id"]}, {"_id": 0, "name": 1, "id": 1})
@@ -1036,7 +1038,7 @@ async def admin_list_users(admin: dict = Depends(require_admin)):
 
 
 @api.put("/admin/users/{user_id}")
-async def admin_update_user(user_id: str, req: AdminUserReq, admin: dict = Depends(require_admin)):
+async def admin_update_user(user_id: str, req: AdminUserReq, admin: dict = Depends(require_founder)):
     u = await db.users.find_one({"id": user_id})
     if not u:
         raise HTTPException(404, "Kullanıcı bulunamadı")
@@ -1052,7 +1054,7 @@ async def admin_update_user(user_id: str, req: AdminUserReq, admin: dict = Depen
 
 
 @api.delete("/admin/users/{user_id}")
-async def admin_delete_user(user_id: str, admin: dict = Depends(require_admin)):
+async def admin_delete_user(user_id: str, admin: dict = Depends(require_founder)):
     if user_id == admin["id"]:
         raise HTTPException(400, "Kendinizi silemezsiniz")
     await db.teams.delete_many({"user_id": user_id})
@@ -1061,7 +1063,7 @@ async def admin_delete_user(user_id: str, admin: dict = Depends(require_admin)):
 
 
 @api.put("/admin/teams/{team_id}")
-async def admin_update_team(team_id: str, req: TeamUpdateReq, admin: dict = Depends(require_admin)):
+async def admin_update_team(team_id: str, req: TeamUpdateReq, admin: dict = Depends(require_founder)):
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(404, "Takım bulunamadı")
@@ -1081,7 +1083,7 @@ async def admin_update_team(team_id: str, req: TeamUpdateReq, admin: dict = Depe
 
 
 @api.delete("/admin/teams/{team_id}")
-async def admin_delete_team(team_id: str, admin: dict = Depends(require_admin)):
+async def admin_delete_team(team_id: str, admin: dict = Depends(require_founder)):
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(404, "Takım bulunamadı")
@@ -1134,6 +1136,68 @@ async def root():
     return {"message": "eFootball League Manager API"}
 
 
+@api.get("/health")
+async def health():
+    return {"status": "ok", "time": now_iso()}
+
+
+# ----------------------------- Branding (founder) -----------------------------
+class BrandingReq(BaseModel):
+    app_name: Optional[str] = None
+    logo_url: Optional[str] = None
+    favicon_url: Optional[str] = None
+
+
+async def get_branding():
+    b = await db.settings.find_one({"id": "branding"}, {"_id": 0})
+    if not b:
+        b = {"id": "branding", "app_name": "eFootball Lig", "logo_url": "", "favicon_url": ""}
+        await db.settings.insert_one(dict(b))
+    return b
+
+
+@api.get("/branding")
+async def read_branding():
+    return await get_branding()
+
+
+@api.put("/founder/branding")
+async def update_branding(req: BrandingReq, founder: dict = Depends(require_founder)):
+    await get_branding()
+    upd = {k: v for k, v in req.model_dump().items() if v is not None}
+    if upd:
+        await db.settings.update_one({"id": "branding"}, {"$set": upd}, upsert=True)
+    return await get_branding()
+
+
+# ----------------------------- Roles (founder) -----------------------------
+class GrantAdminReq(BaseModel):
+    match_id: Optional[str] = None
+
+
+@api.get("/founder/staff")
+async def list_staff(founder: dict = Depends(require_founder)):
+    admins = await db.users.find({"role": "admin"}, {"_id": 0, "password_hash": 0}).to_list(500)
+    return admins
+
+
+@api.post("/founder/users/{user_id}/grant-admin")
+async def grant_admin(user_id: str, req: GrantAdminReq, founder: dict = Depends(require_founder)):
+    u = await db.users.find_one({"id": user_id})
+    if not u:
+        raise HTTPException(404, "Kullanıcı bulunamadı")
+    if u.get("role") == "founder":
+        raise HTTPException(400, "Kurucunun rolü değiştirilemez")
+    await db.users.update_one({"id": user_id}, {"$set": {"role": "admin", "assigned_match_id": req.match_id}})
+    return {"ok": True}
+
+
+@api.post("/founder/users/{user_id}/revoke-admin")
+async def revoke_admin(user_id: str, founder: dict = Depends(require_founder)):
+    await db.users.update_one({"id": user_id}, {"$set": {"role": "user", "assigned_match_id": None}})
+    return {"ok": True}
+
+
 app.include_router(api)
 
 app.add_middleware(
@@ -1159,18 +1223,18 @@ async def startup():
             "username": admin_username,
             "username_lower": admin_username.lower(),
             "password_hash": hash_password(admin_password),
-            "role": "admin",
+            "role": "founder",
             "team_id": None,
             "created_at": now_iso(),
         })
-        logger.info("Admin oluşturuldu: %s", admin_username)
+        logger.info("Kurucu oluşturuldu: %s", admin_username)
     elif not verify_password(admin_password, existing["password_hash"]):
         await db.users.update_one(
             {"id": existing["id"]},
-            {"$set": {"password_hash": hash_password(admin_password), "role": "admin"}},
+            {"$set": {"password_hash": hash_password(admin_password), "role": "founder"}},
         )
-    elif existing.get("role") != "admin":
-        await db.users.update_one({"id": existing["id"]}, {"$set": {"role": "admin"}})
+    elif existing.get("role") != "founder":
+        await db.users.update_one({"id": existing["id"]}, {"$set": {"role": "founder"}})
 
 
 @app.on_event("shutdown")

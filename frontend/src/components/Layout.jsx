@@ -23,11 +23,14 @@ function NavItem({ icon: Icon, label, onClick, active, testid }) {
 }
 
 export function Layout({ children }) {
-  const { user, team, logout } = useAuth();
+  const { user, team, branding, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const appName = branding?.app_name || "eFootball Lig";
+  const logoSrc = branding?.logo_url || "/icon-192.png";
+  const staff = user?.role === "admin" || user?.role === "founder";
 
   const go = (path) => {
     setOpen(false);
@@ -61,18 +64,18 @@ export function Layout({ children }) {
               <SheetContent side="left" className="glass-strong border-white/10 text-white w-72 p-0">
                 <SheetHeader className="p-5 border-b border-white/10" style={{ paddingTop: "calc(1.25rem + env(safe-area-inset-top))" }}>
                   <SheetTitle className="font-heading flex items-center gap-2 text-white">
-                    <img src="/icon-192.png" alt="" className="w-7 h-7" />
-                    eFootball Lig
+                    <img src={logoSrc} alt="" className="w-7 h-7 rounded" />
+                    {appName}
                   </SheetTitle>
                 </SheetHeader>
                 <nav className="p-3 space-y-1">
                   <NavItem icon={Home} label="Ana Sayfa" testid="nav-home" active={location.pathname === "/"} onClick={() => go("/")} />
-                  {user?.role !== "admin" && (
+                  {!staff && (
                     <NavItem icon={Shield} label="Takımım" testid="nav-myteam" active={location.pathname === "/my-team"} onClick={() => go("/my-team")} />
                   )}
                   <NavItem icon={Users} label="Takımlar" testid="nav-teams" active={location.pathname.startsWith("/teams")} onClick={() => go("/teams")} />
-                  {user?.role === "admin" && (
-                    <NavItem icon={Sparkles} label="Admin Paneli" testid="nav-admin" active={location.pathname === "/admin"} onClick={() => go("/admin")} />
+                  {staff && (
+                    <NavItem icon={Sparkles} label={user?.role === "founder" ? "Kurucu Paneli" : "Admin Paneli"} testid="nav-admin" active={location.pathname === "/admin"} onClick={() => go("/admin")} />
                   )}
                   <div className="pt-2 mt-2 border-t border-white/10">
                     <NavItem icon={Bell} label="Bildirimleri Aç" testid="nav-push" onClick={handlePush} />
@@ -82,9 +85,9 @@ export function Layout({ children }) {
               </SheetContent>
             </Sheet>
             <button onClick={() => navigate("/")} className="flex items-center gap-2">
-              <img src="/icon-192.png" alt="logo" className="w-8 h-8" />
-              <span className="font-heading font-extrabold text-lg hidden sm:block tracking-tight">
-                eFootball<span className="neon-text-blue"> LİG</span>
+              <img src={logoSrc} alt="logo" className="w-8 h-8 rounded" />
+              <span className="font-heading font-extrabold text-lg hidden sm:block tracking-tight" data-testid="app-name">
+                {appName}
               </span>
             </button>
           </div>
@@ -118,6 +121,9 @@ export function Layout({ children }) {
                 </div>
               )}
               <span className="text-sm font-medium hidden md:block max-w-[120px] truncate">{manager?.name || user?.username}</span>
+              {user?.role === "founder" && (
+                <span className="px-2 py-0.5 rounded-full bg-yellow-400/15 border border-yellow-400/40 text-[10px] font-bold text-yellow-300">KURUCU</span>
+              )}
               {user?.role === "admin" && (
                 <span className="px-2 py-0.5 rounded-full bg-neon-blue/15 border border-neon-blue/30 text-[10px] font-bold neon-text-blue">ADMIN</span>
               )}
