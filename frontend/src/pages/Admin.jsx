@@ -7,6 +7,7 @@ import { Textarea } from "../components/ui/textarea";
 import { ImageUpload } from "../components/ImageUpload";
 import { VideoUpload } from "../components/VideoUpload";
 import { CancelMatchDialog } from "../components/CancelMatchDialog";
+import { PlayerModal } from "../components/PlayerModal";
 import { CountrySelect } from "../components/CountrySelect";
 import { flagEmoji } from "../lib/countries";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
@@ -17,7 +18,7 @@ import api, { formatError } from "../lib/api";
 import html2canvas from "html2canvas";
 import {
   Trophy, PlayCircle, PauseCircle, Trash2, Shuffle, Plus, Save, Download,
-  Flag, FlagOff, Pencil, X, Loader2, ShieldHalf, UserCog, Palette, Shield, Crown, XCircle,
+  Flag, FlagOff, Pencil, X, Loader2, ShieldHalf, UserCog, Palette, Shield, Crown, XCircle, AtSign,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -54,8 +55,8 @@ export default function Admin() {
       <Tabs defaultValue="tournament">
         <TabsList className="glass rounded-full p-1 flex-wrap h-auto gap-1 mb-6">
           {(isCup
-            ? [["tournament", "Turnuva"], ["cup", "Kupa"], ["players", "Oyuncu Havuzu"], ["magazine", "Magazin"], ["users", "Kullanıcılar"], ["roles", "Roller"], ["branding", "Marka"]]
-            : [["tournament", "Turnuva"], ["fixture", "Fikstür"], ["matches", "Maçlar"], ["players", "Oyuncu Havuzu"], ["magazine", "Magazin"], ["users", "Kullanıcılar"], ["roles", "Roller"], ["branding", "Marka"], ["summary", "Günün Özeti"]]
+            ? [["tournament", "Turnuva"], ["cup", "Kupa"], ["exhibition", "Gösteri Maçı"], ["players", "Oyuncu Havuzu"], ["magazine", "Magazin"], ["users", "Kullanıcılar"], ["roles", "Roller"], ["branding", "Marka"]]
+            : [["tournament", "Turnuva"], ["fixture", "Fikstür"], ["matches", "Maçlar"], ["exhibition", "Gösteri Maçı"], ["players", "Oyuncu Havuzu"], ["magazine", "Magazin"], ["users", "Kullanıcılar"], ["roles", "Roller"], ["branding", "Marka"], ["summary", "Günün Özeti"]]
           ).map(([v, l]) => (
             <TabsTrigger key={v} value={v} data-testid={`admin-tab-${v}`} className="rounded-full data-[state=active]:btn-primary data-[state=active]:text-black text-sm px-4">{l}</TabsTrigger>
           ))}
@@ -72,6 +73,7 @@ export default function Admin() {
           </>
         )}
         <TabsContent value="players"><PlayersTab /></TabsContent>
+        <TabsContent value="exhibition"><ExhibitionTab /></TabsContent>
         <TabsContent value="magazine"><MagazineTab /></TabsContent>
         <TabsContent value="users"><UsersTab /></TabsContent>
         <TabsContent value="roles"><RolesTab tournament={tournament} /></TabsContent>
@@ -596,6 +598,73 @@ function PlayersTab() {
   );
 }
 
+/* ---------------- Exhibition (Gösteri Maçı) ---------------- */
+function ExhibitionTab() {
+  const navigate = useNavigate();
+  const confirm = useConfirm();
+  const [teams, setTeams] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [home, setHome] = useState("");
+  const [away, setAway] = useState("");
+  const [time, setTime] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = () => api.get("/exhibition-matches").then((r) => setMatches(r.data)).catch(() => {});
+  useEffect(() => { api.get("/teams").then((r) => setTeams(r.data)).catch(() => {}); load(); }, []);
+
+  const create = async () => {
+    if (!home || !away || home === away) return toast.error("Farklı iki takım seçin");
+    setBusy(true);
+    try {
+      await api.post("/admin/exhibition", { home_team_id: home, away_team_id: away, scheduled_time: time });
+      toast.success("Gösteri maçı oluşturuldu, bildirim gönderildi");
+      setHome(""); setAway(""); setTime(""); load();
+    } catch (e) { toast.error(formatError(e.response?.data?.detail)); } finally { setBusy(false); }
+  };
+
+  const del = async (m) => {
+    const ok = await confirm({ title: "Gösteri maçı silinsin mi?", description: "Maç ve atanan admin yetkisi kaldırılacak.", confirmText: "Sil" });
+    if (!ok) return;
+    try { await api.delete(`/admin/exhibition/${m.id}`); toast.success("Silindi"); load(); }
+    catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Section title="Yeni Gösteri Maçı">
+        <p className="text-sm text-zinc-400 mb-3">Gösteri maçları puan durumunu veya tur atlamayı etkilemez. Oluşturunca tüm kullanıcılara bildirim gider; canlı maç fonksiyonları (gol, devre, bitiş) normal çalışır.</p>
+        <div className="grid sm:grid-cols-4 gap-3 items-end">
+          <div><span className="label-xs">Ev Sahibi</span><select value={home} onChange={(e) => setHome(e.target.value)} data-testid="exh-home-select" className="mt-1 w-full bg-white/5 border border-white/15 rounded-lg px-2 py-2 text-sm"><option value="">Seç</option>{teams.map((t) => <option key={t.id} value={t.id} className="bg-ink-800">{t.name}</option>)}</select></div>
+          <div><span className="label-xs">Deplasman</span><select value={away} onChange={(e) => setAway(e.target.value)} data-testid="exh-away-select" className="mt-1 w-full bg-white/5 border border-white/15 rounded-lg px-2 py-2 text-sm"><option value="">Seç</option>{teams.map((t) => <option key={t.id} value={t.id} className="bg-ink-800">{t.name}</option>)}</select></div>
+          <div><span className="label-xs">Saat (ops.)</span><Input value={time} onChange={(e) => setTime(e.target.value)} placeholder="20:00" className="mt-1 bg-white/5 border-white/15" /></div>
+          <button onClick={create} disabled={busy} data-testid="create-exhibition-btn" className="btn-primary rounded-full px-4 py-2.5 flex items-center justify-center gap-1">{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Oluştur</button>
+        </div>
+      </Section>
+
+      <Section title={`Gösteri Maçları (${matches.length})`}>
+        <div className="space-y-2">
+          {matches.length === 0 && <div className="text-zinc-500 text-sm">Henüz gösteri maçı yok.</div>}
+          {matches.map((m) => (
+            <div key={m.id} data-testid={`exhibition-row-${m.id}`} className="flex items-center justify-between gap-3 flex-wrap glass rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2 min-w-[180px]">
+                <span className="font-heading font-bold">{m.home.abbreviation}</span>
+                <span className="text-zinc-500">vs</span>
+                <span className="font-heading font-bold">{m.away.abbreviation}</span>
+                {m.status === "live" && <span className="text-[10px] neon-text-green animate-pulse-glow ml-2">CANLI</span>}
+                {m.status === "finished" && <span className="text-sm ml-2">{m.home_score}-{m.away_score}</span>}
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => navigate(`/match/${m.id}`)} data-testid={`exh-manage-${m.id}`} className="btn-primary rounded-full px-4 py-1.5 text-sm flex items-center gap-1"><PlayCircle className="w-3.5 h-3.5" /> Yönet</button>
+                <button onClick={() => del(m)} className="rounded-full p-1.5 bg-red-500/15 border border-red-500/40 text-red-300 hover:bg-red-500/25 transition-colors"><Trash2 className="w-4 h-4" /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+    </div>
+  );
+}
+
 /* ---------------- Magazine ---------------- */
 function MagazineTab() {
   const [items, setItems] = useState([]);
@@ -605,14 +674,43 @@ function MagazineTab() {
   const [videoFile, setVideoFile] = useState("");
   const [youtube, setYoutube] = useState("");
   const [highlight, setHighlight] = useState(false);
+  const [targets, setTargets] = useState([]);
+  const [mentions, setMentions] = useState([]);
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
 
   const load = () => api.get("/magazine").then((r) => setItems(r.data));
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); api.get("/mention-targets").then((r) => setTargets(r.data)).catch(() => {}); }, []);
 
+  const onBodyChange = (e) => {
+    const val = e.target.value;
+    setBody(val);
+    const pos = e.target.selectionStart || val.length;
+    const before = val.slice(0, pos);
+    const m = before.match(/@([^\s@]*)$/);
+    if (m) { setMentionQuery(m[1]); setShowMentions(true); }
+    else setShowMentions(false);
+  };
+
+  const pickMention = (t) => {
+    setBody((b) => b.replace(/@([^\s@]*)$/, `@${t.label} `));
+    setMentions((arr) => (arr.some((x) => x.url === t.url && x.label === t.label && x.type === t.type) ? arr : [...arr, { ...t, tag: "" }]));
+    setShowMentions(false);
+  };
+  const setMentionTag = (i, v) => setMentions((arr) => arr.map((m, j) => (j === i ? { ...m, tag: v } : m)));
+  const removeMention = (i) => setMentions((arr) => arr.filter((_, j) => j !== i));
+
+  const filtered = (targets || []).filter((t) => t.label.toLowerCase().includes((mentionQuery || "").toLowerCase())).slice(0, 8);
+
+  const reset = () => { setTitle(""); setBody(""); setImg(""); setVideoFile(""); setYoutube(""); setHighlight(false); setMentions([]); };
   const add = async () => {
     if (!title.trim()) return toast.error("Başlık gerekli");
     const video_url = youtube.trim() || videoFile;
-    try { await api.post("/admin/magazine", { title, body, image_url: img, video_url, is_leader_highlight: highlight }); toast.success("Haber eklendi"); setTitle(""); setBody(""); setImg(""); setVideoFile(""); setYoutube(""); setHighlight(false); load(); }
+    const payload = {
+      title, body, image_url: img, video_url, is_leader_highlight: highlight,
+      mentions: mentions.map((mm) => ({ type: mm.type, label: mm.label, url: mm.url, ref_id: mm.ref_id || "", tag: (mm.tag || "").trim() || mm.default_tag })),
+    };
+    try { await api.post("/admin/magazine", payload); toast.success("Haber eklendi"); reset(); load(); }
     catch (e) { toast.error(formatError(e.response?.data?.detail)); }
   };
   const del = async (id) => { await api.delete(`/admin/magazine/${id}`); load(); };
@@ -622,7 +720,33 @@ function MagazineTab() {
       <Section title="Yeni Haber / Dedikodu / Video">
         <div className="space-y-3 max-w-xl">
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Başlık" data-testid="magazine-title-input" className="bg-white/5 border-white/15" />
-          <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Analiz / dedikodu..." className="bg-white/5 border-white/15" rows={3} />
+          <div className="relative">
+            <Textarea value={body} onChange={onBodyChange} placeholder="Analiz / dedikodu... (@ ile kullanıcı veya sayfa etiketleyin)" data-testid="magazine-body-input" className="bg-white/5 border-white/15" rows={3} />
+            {showMentions && filtered.length > 0 && (
+              <div className="absolute z-50 mt-1 w-full glass-strong rounded-xl overflow-hidden max-h-56 overflow-y-auto thin-scroll border border-white/10" data-testid="mention-dropdown">
+                {filtered.map((t, i) => (
+                  <button key={i} type="button" onClick={() => pickMention(t)} data-testid={`mention-option-${i}`} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-white/10 text-left text-sm">
+                    {t.type === "user" ? <AtSign className="w-4 h-4 text-neon-blue shrink-0" /> : <span className="w-4 h-4 shrink-0 flex items-center justify-center text-neon-blue font-bold">#</span>}
+                    <span className="flex-1 truncate">{t.label}</span>
+                    <span className="text-[10px] text-zinc-500 uppercase">{t.type === "user" ? "kullanıcı" : t.type === "team" ? "takım" : "sayfa"}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {mentions.length > 0 && (
+            <div className="space-y-2" data-testid="mention-list">
+              <span className="label-xs">Bağlantılar (etiket boşsa varsayılan görünür)</span>
+              {mentions.map((mm, i) => (
+                <div key={i} className="flex items-center gap-2 glass rounded-xl px-3 py-2">
+                  <AtSign className="w-4 h-4 text-neon-blue shrink-0" />
+                  <span className="text-sm font-medium min-w-0 truncate flex-1">{mm.label}</span>
+                  <Input value={mm.tag} onChange={(e) => setMentionTag(i, e.target.value)} placeholder={mm.default_tag} data-testid={`mention-tag-${i}`} className="h-8 bg-white/5 border-white/15 max-w-[160px]" />
+                  <button onClick={() => removeMention(i)} className="text-red-400"><X className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+          )}
           <ImageUpload value={img} onChange={setImg} label="Görsel (opsiyonel)" testid="magazine-image" />
           <div className="rounded-2xl border border-white/10 p-3 space-y-3">
             <span className="label-xs text-neon-blue">Video (opsiyonel) · röportaj vb.</span>
@@ -641,7 +765,7 @@ function MagazineTab() {
         <div className="space-y-2">
           {items.map((it) => (
             <div key={it.id} className="flex items-center justify-between glass rounded-xl px-4 py-3">
-              <div className="flex items-center gap-2 min-w-0"><div className="min-w-0"><div className="font-semibold flex items-center gap-1.5">{it.video_url && <PlayCircle className="w-3.5 h-3.5 text-neon-blue shrink-0" />}{it.title}</div><div className="text-xs text-zinc-500 line-clamp-1">{it.body}</div></div></div>
+              <div className="flex items-center gap-2 min-w-0"><div className="min-w-0"><div className="font-semibold flex items-center gap-1.5">{it.video_url && <PlayCircle className="w-3.5 h-3.5 text-neon-blue shrink-0" />}{it.title}{it.mentions && it.mentions.length > 0 && <AtSign className="w-3.5 h-3.5 text-neon-blue shrink-0" />}</div><div className="text-xs text-zinc-500 line-clamp-1">{it.body}</div></div></div>
               <button onClick={() => del(it.id)} className="text-red-400 shrink-0"><Trash2 className="w-4 h-4" /></button>
             </div>
           ))}
@@ -707,6 +831,9 @@ function FounderTeamEditDialog({ team, onClose, onSaved }) {
   const [desc, setDesc] = useState("");
   const [m, setM] = useState({});
   const [country, setCountry] = useState(null);
+  const [players, setPlayers] = useState([]);
+  const [formation, setFormation] = useState("");
+  const [playerEdit, setPlayerEdit] = useState(null); // {index|null}
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -714,6 +841,8 @@ function FounderTeamEditDialog({ team, onClose, onSaved }) {
       setName(team.name || ""); setAbbr(team.abbreviation || ""); setLogo(team.logo_url || "");
       setDesc(team.description || ""); setM(team.manager || {});
       setCountry(team.manager?.nationality ? { name: team.manager.nationality } : null);
+      setPlayers(team.players || []);
+      setFormation(team.formation || "");
     }
   }, [team]);
 
@@ -723,11 +852,26 @@ function FounderTeamEditDialog({ team, onClose, onSaved }) {
       await api.put(`/admin/teams/${team.id}`, {
         name, abbreviation: abbr, logo_url: logo, description: desc,
         manager: { ...m, nationality: country?.name || m.nationality || "", flag: country?.code ? flagEmoji(country.code) : m.flag || "" },
+        players, formation,
       });
       toast.success("Takım güncellendi");
       onSaved && onSaved();
       onClose();
     } catch (e) { toast.error(formatError(e.response?.data?.detail)); } finally { setSaving(false); }
+  };
+
+  const savePlayer = (data) => {
+    setPlayers((arr) => {
+      if (playerEdit && playerEdit.index != null) {
+        return arr.map((p, i) => (i === playerEdit.index ? { ...p, ...data } : p));
+      }
+      return [...arr, { id: `p_${Date.now()}`, slot: "", bench: false, ...data }];
+    });
+    setPlayerEdit(null);
+  };
+  const removePlayer = () => {
+    if (playerEdit && playerEdit.index != null) setPlayers((arr) => arr.filter((_, i) => i !== playerEdit.index));
+    setPlayerEdit(null);
   };
 
   return (
@@ -746,11 +890,38 @@ function FounderTeamEditDialog({ team, onClose, onSaved }) {
             <div><span className="label-xs">Ülke</span><div className="mt-1"><CountrySelect value={country?.name} onChange={setCountry} testid="ft-country" /></div></div>
           </div>
           <div><span className="label-xs">Açıklama</span><Textarea value={desc} onChange={(e) => setDesc(e.target.value)} className="mt-1 bg-white/5 border-white/15" rows={2} /></div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="label-xs">Kadro / Oyuncular ({players.length})</span>
+              <button onClick={() => setPlayerEdit({ index: null })} data-testid="ft-add-player" className="rounded-full px-3 py-1 text-xs btn-primary flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Oyuncu Ekle</button>
+            </div>
+            <div className="space-y-1.5 max-h-52 overflow-y-auto thin-scroll">
+              {players.length === 0 && <div className="text-xs text-zinc-500">Kadroda oyuncu yok.</div>}
+              {players.map((p, i) => (
+                <div key={p.id || i} data-testid={`ft-player-${i}`} className="flex items-center gap-2 glass rounded-lg px-3 py-1.5">
+                  <img src={p.photo_url || "/player-default.png"} alt="" className="w-7 h-7 rounded-full object-cover" />
+                  <span className="text-sm flex-1 truncate">{p.name}{p.slot ? <span className="text-[10px] text-zinc-500 ml-1">{p.slot}</span> : null}</span>
+                  <span className="text-xs neon-text-green font-bold">€{p.value}M</span>
+                  <button onClick={() => setPlayerEdit({ index: i })} data-testid={`ft-edit-player-${i}`} className="text-zinc-300 hover:text-white"><Pencil className="w-3.5 h-3.5" /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <button onClick={save} disabled={saving} data-testid="ft-save-btn" className="btn-primary w-full rounded-full py-2.5 flex items-center justify-center gap-2 disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Kaydet
           </button>
         </div>
       </DialogContent>
+      <PlayerModal
+        open={!!playerEdit}
+        onClose={() => setPlayerEdit(null)}
+        slot={playerEdit && playerEdit.index != null ? { label: players[playerEdit.index]?.slot } : null}
+        player={playerEdit && playerEdit.index != null ? players[playerEdit.index] : null}
+        onSave={savePlayer}
+        onRemove={removePlayer}
+      />
     </Dialog>
   );
 }
@@ -828,18 +999,23 @@ function useAssignableMatches(tournament) {
     let cancel = false;
     async function load() {
       try {
-        if (!tournament) { setMatches([]); return; }
-        if (tournament.mode === "cup") {
+        let list = [];
+        if (!tournament) {
+          list = [];
+        } else if (tournament.mode === "cup") {
           const { data } = await api.get("/cup/bracket");
-          const flat = [];
           (data.rounds || []).forEach((r) => r.matches.forEach((m) => {
-            if (!m.bye && m.home && m.away) flat.push({ id: m.id, label: `${r.label}: ${teamLabel(m.home)} - ${teamLabel(m.away)}` });
+            if (!m.bye && m.home && m.away && m.status !== "finished") list.push({ id: m.id, label: `${r.label}: ${teamLabel(m.home)} - ${teamLabel(m.away)}` });
           }));
-          if (!cancel) setMatches(flat);
         } else {
           const { data } = await api.get("/matches");
-          if (!cancel) setMatches((data || []).map((m) => ({ id: m.id, label: `H${m.week}: ${teamLabel(m.home)} - ${teamLabel(m.away)}` })));
+          list = (data || []).filter((m) => m.status !== "finished").map((m) => ({ id: m.id, label: `H${m.week}: ${teamLabel(m.home)} - ${teamLabel(m.away)}` }));
         }
+        try {
+          const ex = await api.get("/exhibition-matches");
+          (ex.data || []).filter((m) => m.status !== "finished").forEach((m) => list.push({ id: m.id, label: `Gösteri: ${teamLabel(m.home)} - ${teamLabel(m.away)}` }));
+        } catch { /* ignore */ }
+        if (!cancel) setMatches(list);
       } catch { if (!cancel) setMatches([]); }
     }
     load();

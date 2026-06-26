@@ -2,8 +2,14 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { useConfirm } from "../components/ConfirmProvider";
+import { ImageUpload } from "../components/ImageUpload";
+import { VideoUpload } from "../components/VideoUpload";
+import { VideoPlayer } from "../components/VideoPlayer";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Textarea } from "../components/ui/textarea";
 import api, { formatError } from "../lib/api";
-import { ArrowLeft, Loader2, PlayCircle, FlagOff, Goal, Repeat, Timer } from "lucide-react";
+import { ArrowLeft, Loader2, PlayCircle, FlagOff, Goal, Repeat, Timer, Newspaper, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 const RATE = 45 / 300; // displayed minutes per real second
@@ -86,6 +92,10 @@ export default function MatchTracking() {
   const [goalPick, setGoalPick] = useState(false);
   const [correctPick, setCorrectPick] = useState(false);
   const [penPick, setPenPick] = useState(false);
+  const [news, setNews] = useState([]);
+  const [newsOpen, setNewsOpen] = useState(false);
+  const [newsForm, setNewsForm] = useState({ title: "", body: "", image_url: "", video_file: "", youtube: "" });
+  const [newsBusy, setNewsBusy] = useState(false);
   const pollRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -93,7 +103,12 @@ export default function MatchTracking() {
     catch (e) { toast.error(formatError(e.response?.data?.detail)); }
   }, [id]);
 
-  useEffect(() => { load(); }, [load]);
+  const loadNews = useCallback(async () => {
+    try { const { data } = await api.get(`/matches/${id}/magazine`); setNews(data || []); }
+    catch { /* ignore */ }
+  }, [id]);
+
+  useEffect(() => { load(); loadNews(); }, [load, loadNews]);
   useEffect(() => {
     pollRef.current = setInterval(load, 4000);
     const t = setInterval(() => setTick((x) => x + 1), 1000);
@@ -123,6 +138,24 @@ export default function MatchTracking() {
   const endMatch = async () => {
     const ok = await confirm({ title: "Maç bitirilsin mi?", description: `Skor ${hs} - ${as_} olarak kaydedilecek.`, confirmText: "Maçı Bitir" });
     if (ok) act("end-match");
+  };
+
+  const started = d.live_state !== "scheduled";
+  const submitNews = async () => {
+    if (!newsForm.title.trim()) return toast.error("Başlık gerekli");
+    setNewsBusy(true);
+    try {
+      await api.post(`/admin/matches/${id}/magazine`, {
+        title: newsForm.title,
+        body: newsForm.body,
+        image_url: newsForm.image_url,
+        video_url: newsForm.youtube.trim() || newsForm.video_file,
+      });
+      toast.success("Karşılaşma haberi gönderildi, bildirim yapıldı");
+      setNewsForm({ title: "", body: "", image_url: "", video_file: "", youtube: "" });
+      setNewsOpen(false);
+      loadNews();
+    } catch (e) { toast.error(formatError(e.response?.data?.detail)); } finally { setNewsBusy(false); }
   };
 
   return (
@@ -201,6 +234,55 @@ export default function MatchTracking() {
           {d.live_state === "scheduled" && <p className="text-[11px] text-zinc-500 mt-3">10 dk'lık maç 90 dk'ye sığdırılır. İlk yarı ~5 dk, devre arası 1.5 dk, ikinci yarı ~5 dk. Uzatmaları beklemeden bitirebilirsiniz.</p>}
         </div>
       )}
+
+      {/* Match-specific magazine: founder/assigned admin can post once started */}
+      {can && started && (
+        <div className="mt-4 flex justify-end">
+          <button onClick={() => setNewsOpen(true)} data-testid="match-news-btn" className="rounded-full px-4 py-2.5 glass border border-neon-blue/40 neon-text-blue flex items-center gap-2 hover:bg-neon-blue/10 transition-colors">
+            <Newspaper className="w-4 h-4" /> Maça Özel Magazin
+          </button>
+        </div>
+      )}
+
+      {/* Karşılaşma Haberleri */}
+      {news.length > 0 && (
+        <div className="glass rounded-3xl p-4 sm:p-5 mt-5" data-testid="match-news-section">
+          <h3 className="font-heading text-lg mb-3 flex items-center gap-2"><Newspaper className="w-5 h-5 text-neon-blue" /> Karşılaşma Haberleri</h3>
+          <div className="space-y-4">
+            {news.map((it) => (
+              <div key={it.id} data-testid={`match-news-${it.id}`} className="glass rounded-2xl p-4">
+                {it.video_url ? (
+                  <div className="mb-3"><VideoPlayer url={it.video_url} /></div>
+                ) : it.image_url ? (
+                  <img src={it.image_url} alt="" className="w-full h-40 object-cover rounded-xl mb-3" />
+                ) : null}
+                <div className="font-semibold">{it.title}</div>
+                {it.body && <p className="text-sm text-zinc-400 mt-1 leading-relaxed">{it.body}</p>}
+                {it.created_at && <div className="text-[10px] text-zinc-600 mt-2">{new Date(it.created_at).toLocaleString("tr-TR")}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <Dialog open={newsOpen} onOpenChange={(v) => !v && setNewsOpen(false)}>
+        <DialogContent className="glass-strong border-white/10 text-white sm:max-w-md max-h-[88vh] overflow-y-auto thin-scroll" data-testid="match-news-dialog">
+          <DialogHeader><DialogTitle className="font-heading flex items-center gap-2"><Newspaper className="w-5 h-5 text-neon-blue" /> Maça Özel Magazin</DialogTitle></DialogHeader>
+          <div className="space-y-3 mt-1">
+            <Input value={newsForm.title} onChange={(e) => setNewsForm({ ...newsForm, title: e.target.value })} placeholder="Başlık" data-testid="match-news-title" className="bg-white/5 border-white/15" />
+            <Textarea value={newsForm.body} onChange={(e) => setNewsForm({ ...newsForm, body: e.target.value })} placeholder="Açıklama..." rows={3} className="bg-white/5 border-white/15" />
+            <ImageUpload value={newsForm.image_url} onChange={(u) => setNewsForm({ ...newsForm, image_url: u })} label="Görsel (opsiyonel)" testid="match-news-image" />
+            <div className="rounded-2xl border border-white/10 p-3 space-y-3">
+              <span className="label-xs text-neon-blue">Video (opsiyonel)</span>
+              <VideoUpload value={newsForm.video_file} onChange={(u) => setNewsForm({ ...newsForm, video_file: u })} label="Cihazdan Video" testid="match-news-video" />
+              <div><span className="label-xs">veya YouTube Linki</span><Input value={newsForm.youtube} onChange={(e) => setNewsForm({ ...newsForm, youtube: e.target.value })} placeholder="https://youtu.be/..." className="mt-1 bg-white/5 border-white/15" /></div>
+            </div>
+            <button onClick={submitNews} disabled={newsBusy} data-testid="match-news-submit" className="btn-primary w-full rounded-full py-2.5 flex items-center justify-center gap-2 disabled:opacity-50">
+              {newsBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Yayınla
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <PickTeamDialog open={goalPick} title="Gol atan takım?" home={d.home} away={d.away} onClose={() => setGoalPick(false)} onPick={(tid) => { setGoalPick(false); act("goal", { team_id: tid }); }} />
       <PickTeamDialog open={correctPick} title="Golü atan GERÇEK takım?" home={d.home} away={d.away} onClose={() => setCorrectPick(false)} onPick={(tid) => { setCorrectPick(false); act("correct-goal", { team_id: tid }); }} />

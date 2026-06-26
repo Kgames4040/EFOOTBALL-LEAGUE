@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { StandingsTable } from "../components/StandingsTable";
 import { FixtureScroll } from "../components/FixtureScroll";
+import { MatchRow } from "../components/FixtureScroll";
 import { LeaderHighlight, MagazineFeed } from "../components/StatsWidgets";
 import { MagazineArchive } from "../components/MagazineArchive";
 import { ExpandableSection, StandingsPreview, FixturePreview } from "../components/HomeSections";
@@ -12,14 +13,30 @@ import { useAuth } from "../context/AuthContext";
 import api from "../lib/api";
 import { Trophy, PauseCircle, CalendarDays, Sparkles, ShieldHalf, Maximize2 } from "lucide-react";
 
+function ExhibitionSection({ matches }) {
+  if (!matches || matches.length === 0) return null;
+  return (
+    <section className="glass rounded-3xl p-4 sm:p-5" data-testid="exhibition-section">
+      <h3 className="font-heading text-lg sm:text-xl mb-3 flex items-center gap-2">
+        <Sparkles className="w-5 h-5 text-neon-blue" /> GÖSTERİ MAÇLARI
+      </h3>
+      <div className="space-y-2">
+        {matches.map((m) => <MatchRow key={m.id} m={m} />)}
+      </div>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tournament, setTournament] = useState(null);
   const [standings, setStandings] = useState([]);
   const [matches, setMatches] = useState([]);
   const [magazine, setMagazine] = useState([]);
   const [bracket, setBracket] = useState(null);
+  const [exhibitions, setExhibitions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -29,6 +46,7 @@ export default function Dashboard() {
 
   const load = async () => {
     try {
+      try { const ex = await api.get("/exhibition-matches"); setExhibitions(ex.data || []); } catch { /* ignore */ }
       const t = await api.get("/tournament/active");
       const tour = t.data;
       setTournament(tour);
@@ -56,6 +74,21 @@ export default function Dashboard() {
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const mid = searchParams.get("magazine");
+    if (mid && magazine.length > 0) {
+      const item = magazine.find((m) => m.id === mid);
+      if (item) {
+        setSelected(item);
+        setArchiveOpen(true);
+        const sp = new URLSearchParams(searchParams);
+        sp.delete("magazine");
+        setSearchParams(sp, { replace: true });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [magazine, searchParams]);
 
   if (loading) {
     return <Layout><div className="text-center text-zinc-500 py-20">Yükleniyor...</div></Layout>;
@@ -118,6 +151,7 @@ export default function Dashboard() {
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 min-w-0">
             <CupBracket bracket={bracket} onOpenSummary={() => setSummaryOpen(true)} />
+            <div className="mt-6"><ExhibitionSection matches={exhibitions} /></div>
           </div>
           <div className="space-y-6">
             <MagazineFeed
@@ -172,6 +206,7 @@ export default function Dashboard() {
           </button>
         </div>
 
+        <ExhibitionSection matches={exhibitions} />
         <LeaderHighlight leader={standings[0]} />
         <MagazineFeed
           items={magazine}
@@ -197,6 +232,7 @@ export default function Dashboard() {
             </div>
             <FixtureScroll matches={matches} />
           </section>
+          <ExhibitionSection matches={exhibitions} />
         </div>
         <div className="space-y-6">
           <LeaderHighlight leader={standings[0]} />

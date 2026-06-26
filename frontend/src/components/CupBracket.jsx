@@ -202,7 +202,19 @@ export function CupBracket({ bracket, onOpenSummary }) {
       </div>
 
       <FullscreenModal open={full} onClose={() => setFull(false)} title="Eşleşme Ağacı" testid="bracket-fullscreen-modal">
-        <BracketTree rounds={rounds} lineColor="rgba(0,245,255,0.35)" labelClass="text-neon-blue" testid="cup-tree-full" colWidth={220} renderMatch={(m, i) => <CupMatchCard m={m} index={i} />} />
+        <div className="space-y-6 max-w-3xl mx-auto" data-testid="bracket-fullscreen-vertical">
+          {rounds.map((r) => (
+            <div key={r.round}>
+              <div className="flex items-center justify-between mb-2 px-1">
+                <h4 className="font-heading text-base neon-text-blue uppercase tracking-wide">{r.label}</h4>
+                <span className="text-[11px] text-zinc-500">{r.matches.length} eşleşme{r.complete ? " · Bitti" : ""}</span>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {r.matches.map((m, i) => <CupMatchCard key={m.id} m={m} index={i} />)}
+              </div>
+            </div>
+          ))}
+        </div>
       </FullscreenModal>
     </div>
   );

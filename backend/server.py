@@ -141,12 +141,28 @@ class LeaderboardReq(BaseModel):
     assists: List[LeaderEntry] = []
 
 
+class MentionItem(BaseModel):
+    type: str = "page"      # "user" | "page"
+    label: str = ""
+    url: str = ""
+    tag: str = ""
+    ref_id: str = ""
+
+
 class MagazineReq(BaseModel):
     title: str
     body: str = ""
     image_url: str = ""
     video_url: str = ""
     is_leader_highlight: bool = False
+    mentions: Optional[List[MentionItem]] = []
+
+
+class MatchMagazineReq(BaseModel):
+    title: str
+    body: str = ""
+    image_url: str = ""
+    video_url: str = ""
 
 
 class PoolClubReq(BaseModel):
@@ -190,6 +206,12 @@ class PoolPlayerReq(BaseModel):
     value: float = 0.0
     club: str = ""
     club_logo_url: str = ""
+
+
+class ExhibitionReq(BaseModel):
+    home_team_id: str
+    away_team_id: str
+    scheduled_time: str = ""
 
 
 # ----------------------------- Auth -----------------------------
@@ -366,6 +388,18 @@ async def save_squad(req: SquadReq, user: dict = Depends(get_current_user)):
     if not team:
         raise HTTPException(404, "Takım bulunamadı")
     players = [p.model_dump() for p in req.players]
+    # Enforce locked pool-player values: if a squad player's full name matches a
+    # founder-defined pool player, its value is forced to the pool value.
+    pool = await db.player_pool.find({}, {"_id": 0, "name": 1, "surname": 1, "value": 1}).to_list(2000)
+    pool_val = {}
+    for pp in pool:
+        full = f"{pp.get('name', '')} {pp.get('surname', '')}".strip().lower()
+        if full:
+            pool_val[full] = pp.get("value", 0)
+    for p in players:
+        key = (p.get("name") or "").strip().lower()
+        if key in pool_val:
+            p["value"] = pool_val[key]
     await db.teams.update_one(
         {"id": team["id"]},
         {"$set": {"formation": req.formation, "players": players}},
@@ -479,6 +513,8 @@ async def build_match_view(m: dict):
     return {
         "id": m["id"],
         "week": m["week"],
+        "mode": m.get("mode", "league"),
+        "exhibition": m.get("exhibition", False),
         "home_team_id": m["home_team_id"],
         "away_team_id": m["away_team_id"],
         "home": home or {"name": "?", "abbreviation": "???", "logo_url": ""},
@@ -590,7 +626,7 @@ async def start_match(match_id: str, admin: dict = Depends(require_founder)):
     await broadcast_push(
         "🟢 Maç Başladı!",
         f"{view['home']['name']} - {view['away']['name']}",
-        "/",
+        f"/match/{match_id}",
     )
     return {"status": "live"}
 
@@ -614,7 +650,7 @@ async def finish_match(match_id: str, req: FinishReq, admin: dict = Depends(requ
     await broadcast_push(
         "🏁 Maç Bitti!",
         f"{view['home']['name']} {req.home_score} - {req.away_score} {view['away']['name']}",
-        "/",
+        f"/match/{match_id}",
     )
     return {"status": "finished"}
 
@@ -664,9 +700,58 @@ async def cancel_match(match_id: str, req: CancelMatchReq, admin: dict = Depends
         t["id"] if t else None,
         f"⛔ MAÇ İPTALİ {view['home']['name']} - {view['away']['name']}",
         req.reason or "Maç iptal edildi.",
-        url="/",
     )
     return {"status": "canceled"}
+
+
+# ----------------------------- Exhibition (gösteri) matches -----------------------------
+@api.get("/exhibition-matches")
+async def list_exhibition_matches():
+    matches = await db.matches.find({"exhibition": True}, {"_id": 0}).to_list(500)
+    matches.sort(key=lambda m: m.get("created_at") or "")
+    return [await build_match_view(m) for m in matches]
+
+
+@api.post("/admin/exhibition")
+async def create_exhibition(req: ExhibitionReq, admin: dict = Depends(require_founder)):
+    if req.home_team_id == req.away_team_id:
+        raise HTTPException(400, "Farklı iki takım seçin")
+    home = await db.teams.find_one({"id": req.home_team_id}, {"_id": 0})
+    away = await db.teams.find_one({"id": req.away_team_id}, {"_id": 0})
+    if not home or not away:
+        raise HTTPException(404, "Takım bulunamadı")
+    doc = {
+        "id": new_id(),
+        "tournament_id": None,
+        "exhibition": True,
+        "mode": "exhibition",
+        "week": 0,
+        "home_team_id": req.home_team_id,
+        "away_team_id": req.away_team_id,
+        "home_score": None,
+        "away_score": None,
+        "scheduled_time": req.scheduled_time,
+        "status": "scheduled",
+        "live_state": "scheduled",
+        "created_at": now_iso(),
+    }
+    await db.matches.insert_one(dict(doc))
+    await broadcast_push(
+        "🤝 GÖSTERİ MAÇI OLUŞTURULDU",
+        f"{home['name']} - {away['name']}",
+        f"/match/{doc['id']}",
+    )
+    return await build_match_view(doc)
+
+
+@api.delete("/admin/exhibition/{match_id}")
+async def delete_exhibition(match_id: str, admin: dict = Depends(require_founder)):
+    m = await db.matches.find_one({"id": match_id})
+    if not m or not m.get("exhibition"):
+        raise HTTPException(404, "Gösteri maçı bulunamadı")
+    await db.matches.delete_one({"id": match_id})
+    await db.users.update_many({"assigned_match_id": match_id}, {"$set": {"assigned_match_id": None, "role": "user"}})
+    return {"deleted": True}
 
 
 # ----------------------------- Cup (knockout) -----------------------------
@@ -927,7 +1012,7 @@ async def cup_start_match(match_id: str, admin: dict = Depends(require_founder))
     await db.matches.update_one({"id": match_id}, {"$set": {"status": "live", "started_at": now_iso()}})
     home = await team_lite(m["home_team_id"])
     away = await team_lite(m.get("away_team_id"))
-    await broadcast_push("🟢 Maç Başladı!", f"{home['name']} - {away['name'] if away else '?'}", "/")
+    await broadcast_push("🟢 Maç Başladı!", f"{home['name']} - {away['name'] if away else '?'}", f"/match/{match_id}")
     return {"status": "live"}
 
 
@@ -970,7 +1055,7 @@ async def cup_set_result(match_id: str, req: CupResultReq, admin: dict = Depends
         home = await team_lite(m["home_team_id"])
         away = await team_lite(m.get("away_team_id"))
         pen = " (P)" if hs == as_ else ""
-        await broadcast_push("🏁 Maç Bitti!", f"{home['name']} {hs} - {as_} {away['name'] if away else '?'}{pen}", "/")
+        await broadcast_push("🏁 Maç Bitti!", f"{home['name']} {hs} - {as_} {away['name'] if away else '?'}{pen}", f"/match/{match_id}")
     await maybe_advance_round(m["tournament_id"], m["round"])
     return {"ok": True, "winner_team_id": winner}
 
@@ -1008,7 +1093,6 @@ async def cup_cancel_match(match_id: str, req: CupCancelReq, admin: dict = Depen
         m["tournament_id"],
         f"⛔ MAÇ İPTALİ {home['name']} - {away['name'] if away else '?'}",
         req.reason or "Maç iptal edildi.",
-        url="/",
     )
     await maybe_advance_round(m["tournament_id"], m["round"])
     return {"status": "canceled", "winner_team_id": winner}
@@ -1045,7 +1129,7 @@ async def get_match_or_404(match_id: str):
 
 async def get_last5(team_id: str):
     cur = db.matches.find(
-        {"status": "finished", "home_score": {"$ne": None},
+        {"status": "finished", "home_score": {"$ne": None}, "exhibition": {"$ne": True},
          "$or": [{"home_team_id": team_id}, {"away_team_id": team_id}]},
         {"_id": 0, "home_team_id": 1, "away_team_id": 1, "home_score": 1, "away_score": 1, "finished_at": 1},
     )
@@ -1117,8 +1201,9 @@ async def match_detail(match_id: str, user: dict = Depends(get_current_user)):
 @api.post("/live/matches/{match_id}/start-first-half")
 async def live_start_first_half(match_id: str, user: dict = Depends(require_staff)):
     await check_match_access(match_id, user)
-    await ensure_running()
     m = await get_match_or_404(match_id)
+    if not m.get("exhibition"):
+        await ensure_running()
     if m.get("bye"):
         raise HTTPException(400, "Bay maçı başlatılamaz")
     if m.get("live_state") in ("first_half", "second_half"):
@@ -1202,8 +1287,9 @@ async def live_correct_goal(match_id: str, req: GoalReq, user: dict = Depends(re
 @api.post("/live/matches/{match_id}/end-match")
 async def live_end_match(match_id: str, req: LiveFinishReq, user: dict = Depends(require_staff)):
     await check_match_access(match_id, user)
-    await ensure_running()
     m = await get_match_or_404(match_id)
+    if not m.get("exhibition"):
+        await ensure_running()
     if m.get("live_state") not in ("first_half", "halftime", "second_half"):
         raise HTTPException(400, "Bitirilecek canlı maç yok")
     hs, as_ = m.get("live_home", 0), m.get("live_away", 0)
@@ -1327,23 +1413,28 @@ async def set_leaderboard(req: LeaderboardReq, admin: dict = Depends(require_fou
 # ----------------------------- Magazine -----------------------------
 @api.get("/magazine")
 async def get_magazine():
-    items = await db.magazine.find({}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    items = await db.magazine.find({"match_id": None}, {"_id": 0}).sort("created_at", -1).to_list(50)
     return items
 
 
-async def publish_magazine(tournament_id, title, body="", image_url="", is_leader_highlight=False, push=True, video_url="", url="/"):
+async def publish_magazine(tournament_id, title, body="", image_url="", is_leader_highlight=False, push=True, video_url="", url=None, match_id=None, mentions=None):
+    doc_id = new_id()
     doc = {
-        "id": new_id(),
+        "id": doc_id,
         "tournament_id": tournament_id,
         "title": title,
         "body": body,
         "image_url": image_url,
         "video_url": video_url,
         "is_leader_highlight": is_leader_highlight,
+        "match_id": match_id,
+        "mentions": mentions or [],
         "created_at": now_iso(),
     }
     await db.magazine.insert_one(dict(doc))
     doc.pop("_id", None)
+    if url is None:
+        url = f"/match/{match_id}" if match_id else f"/?magazine={doc_id}"
     if push:
         await broadcast_push(f"📰 {title}", (body or "")[:140] or "Yeni haber yayınlandı", url)
     return doc
@@ -1353,8 +1444,42 @@ async def publish_magazine(tournament_id, title, body="", image_url="", is_leade
 async def add_magazine(req: MagazineReq, admin: dict = Depends(require_founder)):
     t = await active_tournament()
     return await publish_magazine(
-        t["id"] if t else None, req.title, req.body, req.image_url, req.is_leader_highlight, video_url=req.video_url
+        t["id"] if t else None, req.title, req.body, req.image_url, req.is_leader_highlight,
+        video_url=req.video_url, mentions=[mm.model_dump() for mm in (req.mentions or [])],
     )
+
+
+@api.get("/matches/{match_id}/magazine")
+async def get_match_magazine(match_id: str, user: dict = Depends(get_current_user)):
+    items = await db.magazine.find({"match_id": match_id}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    return items
+
+
+@api.post("/admin/matches/{match_id}/magazine")
+async def add_match_magazine(match_id: str, req: MatchMagazineReq, user: dict = Depends(require_staff)):
+    await check_match_access(match_id, user)
+    m = await get_match_or_404(match_id)
+    t_id = m.get("tournament_id")
+    return await publish_magazine(
+        t_id, req.title, req.body, req.image_url, False,
+        video_url=req.video_url, match_id=match_id,
+    )
+
+
+@api.get("/mention-targets")
+async def mention_targets(user: dict = Depends(require_founder)):
+    targets = [
+        {"type": "page", "label": "Ana Sayfa", "url": "/", "default_tag": "Ana Sayfa", "ref_id": ""},
+        {"type": "page", "label": "Takımlar", "url": "/teams", "default_tag": "Takımlar", "ref_id": ""},
+    ]
+    teams = await db.teams.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(500)
+    for t in teams:
+        targets.append({"type": "team", "label": t["name"], "url": f"/teams/{t['id']}", "default_tag": t["name"], "ref_id": t["id"]})
+    users = await db.users.find({}, {"_id": 0, "id": 1, "username": 1, "team_id": 1}).to_list(500)
+    for u in users:
+        url = f"/teams/{u['team_id']}" if u.get("team_id") else "/teams"
+        targets.append({"type": "user", "label": u["username"], "url": url, "default_tag": f"@{u['username']}", "ref_id": u["id"]})
+    return targets
 
 
 @api.delete("/admin/magazine/{item_id}")

@@ -2,6 +2,7 @@ import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Newspaper } from "lucide-react";
 import { VideoPlayer } from "./VideoPlayer";
+import { MentionChips } from "./MentionChips";
 
 export function MagazineArchive({ open, onClose, items, initial }) {
   return (
@@ -24,6 +25,7 @@ export function MagazineArchive({ open, onClose, items, initial }) {
                 <div className="font-semibold">{it.title}</div>
               </div>
               {it.body && <p className="text-sm text-zinc-400 mt-1 leading-relaxed">{it.body}</p>}
+              <MentionChips mentions={it.mentions} onNavigate={onClose} />
               {it.created_at && <div className="text-[10px] text-zinc-600 mt-2">{new Date(it.created_at).toLocaleString("tr-TR")}</div>}
             </div>
           ))}
