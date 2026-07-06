@@ -1,0 +1,180 @@
+/* Betting section theme (premium casino/neon).
+   Scoped by wrapping the section in .betting-scope */
+
+.betting-scope {
+  --btg-bg: #111417;
+  --btg-surface: #1d2023;
+  --btg-surface-high: #272a2e;
+  --btg-primary: #00f2ea;
+  --btg-primary-soft: #29fcf3;
+  --btg-accent: #c3f400;
+  --btg-text: #e1e2e7;
+  --btg-muted: #b9cac8;
+  --btg-border: #3a4a48;
+  color: var(--btg-text);
+  font-family: "Inter", "Outfit", sans-serif;
+}
+
+.betting-scope .btg-card {
+  background: linear-gradient(180deg, rgba(29,32,35,0.9) 0%, rgba(17,20,23,0.95) 100%);
+  border: 1px solid rgba(0,242,234,0.18);
+  border-radius: 20px;
+  box-shadow: 0 10px 40px -20px rgba(0,242,234,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.betting-scope .btg-pill {
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  font-size: 12px;
+  border: 1px solid rgba(0,242,234,0.35);
+  color: var(--btg-primary);
+  background: rgba(0,242,234,0.08);
+}
+
+.betting-scope .btg-odd-btn {
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid rgba(58,74,72,0.7);
+  background: linear-gradient(180deg, rgba(39,42,46,0.9), rgba(17,20,23,0.9));
+  transition: all 0.18s ease;
+  padding: 10px 12px;
+  font-family: "JetBrains Mono", monospace;
+  min-height: 66px;
+  overflow: hidden;
+}
+.betting-scope .btg-odd-btn:hover:not(:disabled) {
+  border-color: rgba(0,242,234,0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px -10px rgba(0,242,234,0.35);
+}
+.betting-scope .btg-odd-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.betting-scope .btg-odd-btn.active {
+  border-color: var(--btg-primary);
+  background: linear-gradient(180deg, rgba(0,242,234,0.22), rgba(0,242,234,0.05));
+  box-shadow: 0 0 0 2px rgba(0,242,234,0.35), 0 8px 22px -8px rgba(0,242,234,0.55);
+}
+.betting-scope .btg-odd-btn.active::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% -20%, rgba(195,244,0,0.18), transparent 60%);
+  pointer-events: none;
+}
+
+.betting-scope .btg-slip-bar {
+  background: linear-gradient(180deg, rgba(29,32,35,0.98), rgba(11,14,17,0.98));
+  border: 1px solid rgba(0,242,234,0.35);
+  box-shadow: 0 -10px 40px -12px rgba(0,242,234,0.35);
+  backdrop-filter: blur(12px);
+}
+
+.betting-scope .btg-cta {
+  background: linear-gradient(90deg, #00f2ea, #29fcf3);
+  color: #003735;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 12px 20px;
+  transition: all 0.18s ease;
+  box-shadow: 0 10px 30px -8px rgba(0,242,234,0.55);
+}
+.betting-scope .btg-cta:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 14px 34px -10px rgba(0,242,234,0.75); }
+.betting-scope .btg-cta:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.betting-scope .btg-danger {
+  background: linear-gradient(90deg, #ff5b6b, #ff8080);
+  color: #240001;
+  font-weight: 800;
+  border-radius: 999px;
+}
+
+.betting-scope .btg-tab {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  font-size: 12px;
+  border: 1px solid rgba(58,74,72,0.9);
+  color: var(--btg-muted);
+  background: rgba(17,20,23,0.6);
+  transition: all 0.18s ease;
+}
+.betting-scope .btg-tab:hover { color: var(--btg-text); border-color: rgba(0,242,234,0.35); }
+.betting-scope .btg-tab.active { color: #003735; background: var(--btg-accent); border-color: var(--btg-accent); }
+
+.betting-scope .btg-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-weight: 800; font-size: 11px; letter-spacing: 0.05em;
+  padding: 4px 10px; border-radius: 999px;
+  text-transform: uppercase;
+}
+.badge-won { background: rgba(195,244,0,0.15); color: #c3f400; border: 1px solid rgba(195,244,0,0.5); }
+.badge-lost { background: rgba(255,91,107,0.15); color: #ff8f9c; border: 1px solid rgba(255,91,107,0.4); }
+.badge-pending { background: rgba(0,242,234,0.12); color: var(--btg-primary); border: 1px solid rgba(0,242,234,0.4); }
+.badge-refunded { background: rgba(180,180,180,0.15); color: #d0d5da; border: 1px solid rgba(180,180,180,0.4); }
+
+@keyframes btgPulseGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(0,242,234,0.6); } 50% { box-shadow: 0 0 0 8px rgba(0,242,234,0); } }
+.betting-scope .btg-live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: #ff5b6b; animation: btgPulseGlow 1.6s ease-in-out infinite; }
+
+.betting-scope .btg-num {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+}
+
+.betting-scope .coin-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px 4px 4px;
+  background: rgba(0,242,234,0.1);
+  border: 1px solid rgba(0,242,234,0.4);
+  border-radius: 999px;
+  font-weight: 800; color: var(--btg-primary);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.betting-scope details > summary { list-style: none; cursor: pointer; }
+.betting-scope details > summary::-webkit-details-marker { display: none; }
+
+@keyframes btgSlideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.btg-slide-up { animation: btgSlideUp 0.32s cubic-bezier(.2,.9,.3,1.2) both; }
+
+@keyframes btgConfetti {
+  0% { transform: translateY(0) rotate(0); opacity: 1; }
+  100% { transform: translateY(120vh) rotate(720deg); opacity: 0; }
+}
+.btg-confetti > i {
+  position: fixed; top: -10vh; font-size: 22px;
+  animation: btgConfetti 3.2s linear both;
+}
+
+/* Compact grid for mobile odds row */
+.betting-scope .odds-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.betting-scope .odds-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+
+/* Segmented switcher (Canlı Sonuçlar / Bahis) */
+.section-switcher {
+  display: inline-flex;
+  padding: 4px;
+  background: rgba(20, 20, 24, 0.7);
+  border: 1px solid rgba(0, 242, 234, 0.25);
+  border-radius: 999px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 20px -6px rgba(0, 242, 234, 0.25);
+}
+.section-switcher button {
+  padding: 8px 20px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  color: #b9cac8;
+  transition: all 0.2s;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.section-switcher button.active {
+  background: linear-gradient(90deg, #00f2ea, #29fcf3);
+  color: #003735;
+  box-shadow: 0 4px 14px -3px rgba(0, 242, 234, 0.65);
+}
+
+/* Group items for kombine display */
+.combo-line { border-left: 2px dashed rgba(0,242,234,0.4); padding-left: 12px; margin-left: 6px; }

@@ -1,0 +1,17 @@
+{
+  "short_name": "Premier Ligi",
+  "name": "12/C Premier Ligi - Futbol",
+  "description": "Arkadaşlarla eFootball lig & turnuva yönetimi",
+  "icons": [
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ],
+  "id": "/",
+  "start_url": "/",
+  "background_color": "#08080A",
+  "theme_color": "#08080A",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/"
+}
