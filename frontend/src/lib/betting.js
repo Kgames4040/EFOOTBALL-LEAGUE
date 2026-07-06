@@ -4,34 +4,64 @@ export const COIN_ICON_URL = "https://customer-assets.emergentagent.com/job_be1f
 
 export const BET_TYPE_LABEL = {
   MS: "Maç Sonucu",
-  GOAL_O_U: "Gol Alt/Üst 2.5",
-  CORNER_O_U: "Korner Alt/Üst 4.5",
+  GOAL: "Toplam Gol Alt/Üst",
+  HOME_GOAL: "Ev Sahibi Gol Alt/Üst",
+  AWAY_GOAL: "Deplasman Gol Alt/Üst",
+  CORNER: "Korner Alt/Üst",
 };
 
 export const SELECTION_LABEL = {
-  "1": "Ev Sahibi (1)",
-  X: "Beraberlik (X)",
-  "2": "Deplasman (2)",
-  OVER_2_5: "Üst 2.5",
-  UNDER_2_5: "Alt 2.5",
-  OVER_4_5: "Korner Üst 4.5",
-  UNDER_4_5: "Korner Alt 4.5",
+  "1": "Ev Sahibi (1)", X: "Beraberlik (X)", "2": "Deplasman (2)",
+  "0_5_U": "Alt 0.5", "0_5_O": "Üst 0.5",
+  "1_5_U": "Alt 1.5", "1_5_O": "Üst 1.5",
+  "2_5_U": "Alt 2.5", "2_5_O": "Üst 2.5",
+  "3_5_U": "Alt 3.5", "3_5_O": "Üst 3.5",
+  "4_5_U": "Alt 4.5", "4_5_O": "Üst 4.5",
+  "7_5_U": "Alt 7.5", "7_5_O": "Üst 7.5",
+  "8_5_U": "Alt 8.5", "8_5_O": "Üst 8.5",
+  "9_5_U": "Alt 9.5", "9_5_O": "Üst 9.5",
+  "10_5_U": "Alt 10.5", "10_5_O": "Üst 10.5",
 };
 
 export const SELECTION_SHORT = {
-  "1": "1",
-  X: "X",
-  "2": "2",
-  OVER_2_5: "ÜST 2.5",
-  UNDER_2_5: "ALT 2.5",
-  OVER_4_5: "K.ÜST 4.5",
-  UNDER_4_5: "K.ALT 4.5",
+  "1": "1", X: "X", "2": "2",
+  "0_5_U": "A 0.5", "0_5_O": "Ü 0.5",
+  "1_5_U": "A 1.5", "1_5_O": "Ü 1.5",
+  "2_5_U": "A 2.5", "2_5_O": "Ü 2.5",
+  "3_5_U": "A 3.5", "3_5_O": "Ü 3.5",
+  "4_5_U": "A 4.5", "4_5_O": "Ü 4.5",
+  "7_5_U": "A 7.5", "7_5_O": "Ü 7.5",
+  "8_5_U": "A 8.5", "8_5_O": "Ü 8.5",
+  "9_5_U": "A 9.5", "9_5_O": "Ü 9.5",
+  "10_5_U": "A 10.5", "10_5_O": "Ü 10.5",
 };
 
 export const ODDS_KEY = {
   MS: { "1": "ms_1", X: "ms_x", "2": "ms_2" },
-  GOAL_O_U: { OVER_2_5: "goal_over_2_5", UNDER_2_5: "goal_under_2_5" },
-  CORNER_O_U: { OVER_4_5: "corner_over_4_5", UNDER_4_5: "corner_under_4_5" },
+  GOAL: {
+    "1_5_U": "goal_1_5_u", "1_5_O": "goal_1_5_o",
+    "2_5_U": "goal_2_5_u", "2_5_O": "goal_2_5_o",
+    "3_5_U": "goal_3_5_u", "3_5_O": "goal_3_5_o",
+    "4_5_U": "goal_4_5_u", "4_5_O": "goal_4_5_o",
+  },
+  HOME_GOAL: {
+    "0_5_U": "home_goal_0_5_u", "0_5_O": "home_goal_0_5_o",
+    "1_5_U": "home_goal_1_5_u", "1_5_O": "home_goal_1_5_o",
+    "2_5_U": "home_goal_2_5_u", "2_5_O": "home_goal_2_5_o",
+    "3_5_U": "home_goal_3_5_u", "3_5_O": "home_goal_3_5_o",
+  },
+  AWAY_GOAL: {
+    "0_5_U": "away_goal_0_5_u", "0_5_O": "away_goal_0_5_o",
+    "1_5_U": "away_goal_1_5_u", "1_5_O": "away_goal_1_5_o",
+    "2_5_U": "away_goal_2_5_u", "2_5_O": "away_goal_2_5_o",
+    "3_5_U": "away_goal_3_5_u", "3_5_O": "away_goal_3_5_o",
+  },
+  CORNER: {
+    "7_5_U": "corner_7_5_u", "7_5_O": "corner_7_5_o",
+    "8_5_U": "corner_8_5_u", "8_5_O": "corner_8_5_o",
+    "9_5_U": "corner_9_5_u", "9_5_O": "corner_9_5_o",
+    "10_5_U": "corner_10_5_u", "10_5_O": "corner_10_5_o",
+  },
 };
 
 export const MIN_STAKE = 30;

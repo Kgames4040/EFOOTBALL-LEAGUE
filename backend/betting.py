@@ -32,32 +32,50 @@ MIN_STAKE = 30
 DEFAULT_STARTING_POINTS = 100
 GOAL_REWARD = 15  # Coin per goal awarded to the team owner (manager user)
 
-BET_TYPES = {"MS", "GOAL_O_U", "CORNER_O_U"}
+BET_TYPES = {"MS", "GOAL", "HOME_GOAL", "AWAY_GOAL", "CORNER"}
 SELECTIONS = {
     "MS": {"1", "X", "2"},
-    "GOAL_O_U": {"OVER_2_5", "UNDER_2_5"},
-    "CORNER_O_U": {"OVER_4_5", "UNDER_4_5"},
+    "GOAL": {"1_5_U", "1_5_O", "2_5_U", "2_5_O", "3_5_U", "3_5_O", "4_5_U", "4_5_O"},
+    "HOME_GOAL": {"0_5_U", "0_5_O", "1_5_U", "1_5_O", "2_5_U", "2_5_O", "3_5_U", "3_5_O"},
+    "AWAY_GOAL": {"0_5_U", "0_5_O", "1_5_U", "1_5_O", "2_5_U", "2_5_O", "3_5_U", "3_5_O"},
+    "CORNER": {"7_5_U", "7_5_O", "8_5_U", "8_5_O", "9_5_U", "9_5_O", "10_5_U", "10_5_O"},
 }
 ODDS_KEYS = {
     "MS": {"1": "ms_1", "X": "ms_x", "2": "ms_2"},
-    "GOAL_O_U": {"OVER_2_5": "goal_over_2_5", "UNDER_2_5": "goal_under_2_5"},
-    "CORNER_O_U": {"OVER_4_5": "corner_over_4_5", "UNDER_4_5": "corner_under_4_5"},
+    "GOAL": {
+        "1_5_U": "goal_1_5_u", "1_5_O": "goal_1_5_o",
+        "2_5_U": "goal_2_5_u", "2_5_O": "goal_2_5_o",
+        "3_5_U": "goal_3_5_u", "3_5_O": "goal_3_5_o",
+        "4_5_U": "goal_4_5_u", "4_5_O": "goal_4_5_o",
+    },
+    "HOME_GOAL": {
+        "0_5_U": "home_goal_0_5_u", "0_5_O": "home_goal_0_5_o",
+        "1_5_U": "home_goal_1_5_u", "1_5_O": "home_goal_1_5_o",
+        "2_5_U": "home_goal_2_5_u", "2_5_O": "home_goal_2_5_o",
+        "3_5_U": "home_goal_3_5_u", "3_5_O": "home_goal_3_5_o",
+    },
+    "AWAY_GOAL": {
+        "0_5_U": "away_goal_0_5_u", "0_5_O": "away_goal_0_5_o",
+        "1_5_U": "away_goal_1_5_u", "1_5_O": "away_goal_1_5_o",
+        "2_5_U": "away_goal_2_5_u", "2_5_O": "away_goal_2_5_o",
+        "3_5_U": "away_goal_3_5_u", "3_5_O": "away_goal_3_5_o",
+    },
+    "CORNER": {
+        "7_5_U": "corner_7_5_u", "7_5_O": "corner_7_5_o",
+        "8_5_U": "corner_8_5_u", "8_5_O": "corner_8_5_o",
+        "9_5_U": "corner_9_5_u", "9_5_O": "corner_9_5_o",
+        "10_5_U": "corner_10_5_u", "10_5_O": "corner_10_5_o",
+    },
 }
-ALL_ODDS_KEYS = [
-    "ms_1", "ms_x", "ms_2",
-    "goal_over_2_5", "goal_under_2_5",
-    "corner_over_4_5", "corner_under_4_5",
-]
+ALL_ODDS_KEYS = []
+for k1, v1 in ODDS_KEYS.items():
+    for k2, v2 in v1.items():
+        ALL_ODDS_KEYS.append(v2)
 
-DEFAULT_ODDS = {
-    "ms_1": 2.20,
-    "ms_x": 3.10,
-    "ms_2": 2.70,
-    "goal_over_2_5": 1.75,
-    "goal_under_2_5": 1.95,
-    "corner_over_4_5": 1.85,
-    "corner_under_4_5": 1.85,
-}
+DEFAULT_ODDS = {k: 1.85 for k in ALL_ODDS_KEYS}
+DEFAULT_ODDS["ms_1"] = 2.20
+DEFAULT_ODDS["ms_x"] = 3.10
+DEFAULT_ODDS["ms_2"] = 2.70
 
 
 def now_iso():
@@ -134,16 +152,19 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 SYSTEM_PROMPT_ODDS = (
     "You are a professional football (soccer) betting odds compiler for an eFootball amateur league. "
-    "Given two teams' recent form and head-to-head data, produce realistic decimal odds. "
+    "Given two teams' recent form, head-to-head data, and tournament context, produce realistic decimal odds. "
     "Rules:\n"
     "1) Return STRICT JSON only, no prose, no markdown fences.\n"
-    "2) Fields (all required, decimal >= 1.10):\n"
-    "   ms_1, ms_x, ms_2, goal_over_2_5, goal_under_2_5, corner_over_4_5, corner_under_4_5\n"
-    "3) MS probabilities (1/odd) must sum roughly to 1.05-1.15 (bookmaker margin).\n"
-    "4) Over/Under pairs must also sum roughly to 1.05-1.15 (margin).\n"
-    "5) Cold-start rule: if a team has fewer than 5 matches OR no corner history, use balanced ~1.85/~1.85 for corners.\n"
-    "6) Realistic ranges: MS between 1.30 and 8.00. O/U between 1.40 and 3.20.\n"
-    "7) Round to two decimals."
+    "2) Fields (all required, decimal >= 1.01):\n"
+    "   - MS: ms_1, ms_x, ms_2\n"
+    "   - GOAL: goal_1_5_u, goal_1_5_o, goal_2_5_u, goal_2_5_o, goal_3_5_u, goal_3_5_o, goal_4_5_u, goal_4_5_o\n"
+    "   - HOME GOAL: home_goal_0_5_u, home_goal_0_5_o, home_goal_1_5_u, home_goal_1_5_o, home_goal_2_5_u, home_goal_2_5_o, home_goal_3_5_u, home_goal_3_5_o\n"
+    "   - AWAY GOAL: away_goal_0_5_u, away_goal_0_5_o, away_goal_1_5_u, away_goal_1_5_o, away_goal_2_5_u, away_goal_2_5_o, away_goal_3_5_u, away_goal_3_5_o\n"
+    "   - CORNER: corner_7_5_u, corner_7_5_o, corner_8_5_u, corner_8_5_o, corner_9_5_u, corner_9_5_o, corner_10_5_u, corner_10_5_o\n"
+    "3) Probabilities (1/odd) for mutually exclusive outcomes must sum to ~1.05-1.15 (margin).\n"
+    "4) Realistic ranges: MS between 1.10 and 15.00. O/U between 1.10 and 8.00.\n"
+    "5) Keep odds mathematically coherent (e.g. over 1.5 must have lower odds than over 2.5).\n"
+    "6) Round to two decimals."
 )
 
 
@@ -157,7 +178,7 @@ async def generate_odds_via_groq(context: Dict[str, Any]) -> Dict[str, float]:
     prompt = (
         "Return JSON odds for the upcoming match.\n"
         f"HOME_TEAM: {context.get('home_name')}\n"
-        f"AWAY_TEAM: {context.get('away_name')}\n"
+        f"AWAY_TEAM: {context.get('AWAY_NAME')}\n"
         f"HOME_LAST5: {json.dumps(context.get('home_last5', []))}\n"
         f"AWAY_LAST5: {json.dumps(context.get('away_last5', []))}\n"
         f"HEAD_TO_HEAD: {json.dumps(context.get('h2h', {}))}\n"
@@ -167,6 +188,11 @@ async def generate_odds_via_groq(context: Dict[str, Any]) -> Dict[str, float]:
         f"AWAY_AVG_CORNERS: {context.get('away_avg_corners')}\n"
         f"LEAGUE_AVG_GOALS_PER_MATCH: {context.get('league_avg_goals', 2.7)}\n"
         f"LEAGUE_AVG_CORNERS_PER_MATCH: {context.get('league_avg_corners', 5.5)}\n"
+        "TOURNAMENT_CONTEXT (PUSSY CUP):\n"
+        "- Top Scorer: xiyankarFC (21 goals)\n"
+        "- Quarter Finals: KÖY 0-4 KSL, NX 3-2 FLL, XFC 2-1 NFC, KSL 1-3 NX, KSL 1-5 XFC, NX 1-8 XFC\n"
+        "- Final: XFC 6-5 NX\n"
+        "- Note: XFC (xiyankarFC) is highly offensive. Adjust odds dynamically based on these historical performances if applicable.\n"
     )
 
     payload = {
@@ -177,7 +203,7 @@ async def generate_odds_via_groq(context: Dict[str, Any]) -> Dict[str, float]:
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.4,
-        "max_tokens": 300,
+        "max_tokens": 1500,
     }
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     try:
@@ -333,20 +359,30 @@ def _selection_result(bet_type: str, selection: str, home_score: int, away_score
     if bet_type == "MS":
         outcome = "1" if home_score > away_score else ("2" if away_score > home_score else "X")
         return "WON" if selection == outcome else "LOST"
-    if bet_type == "GOAL_O_U":
-        total = home_score + away_score
-        over = total > 2.5  # >2.5 means >=3
-        if selection == "OVER_2_5":
-            return "WON" if over else "LOST"
-        return "WON" if not over else "LOST"
-    if bet_type == "CORNER_O_U":
-        if home_corners is None or away_corners is None:
+        
+    if bet_type in ("GOAL", "HOME_GOAL", "AWAY_GOAL", "CORNER"):
+        if bet_type == "CORNER" and (home_corners is None or away_corners is None):
             return None
-        total = home_corners + away_corners
-        over = total > 4.5
-        if selection == "OVER_4_5":
-            return "WON" if over else "LOST"
-        return "WON" if not over else "LOST"
+            
+        if bet_type == "GOAL":
+            val = home_score + away_score
+        elif bet_type == "HOME_GOAL":
+            val = home_score
+        elif bet_type == "AWAY_GOAL":
+            val = away_score
+        elif bet_type == "CORNER":
+            val = home_corners + away_corners
+            
+        parts = selection.split("_")
+        limit = float(f"{parts[0]}.{parts[1]}")
+        is_over = (parts[2] == "O")
+        
+        actual_is_over = val > limit
+        if is_over:
+            return "WON" if actual_is_over else "LOST"
+        else:
+            return "WON" if not actual_is_over else "LOST"
+            
     return None
 
 
@@ -490,8 +526,7 @@ async def admin_override_odds(req: OddsOverrideReq, admin: dict = Depends(requir
 
 @router.post("/bet-lock")
 async def admin_bet_lock(req: BetLockReq, admin: dict = Depends(require_founder)):
-    if req.bet_type not in BET_TYPES:
-        raise HTTPException(400, "Geçersiz bahis türü")
+    # Allow any string for specific line locking (e.g., 'CORNER_7_5', 'MS_1', etc.)
     field = f"bet_locks.{req.bet_type}"
     await db.matches.update_one({"id": req.match_id}, {"$set": {field: bool(req.locked)}})
     m = await db.matches.find_one({"id": req.match_id}, {"_id": 0, "bet_locks": 1})
@@ -522,9 +557,12 @@ async def create_coupon(req: CouponCreateReq, user: dict = Depends(get_current_u
             raise HTTPException(404, f"Maç bulunamadı: {it.match_id}")
         if m.get("status") != "scheduled":
             raise HTTPException(400, "Sadece programlanmış maçlara bahis oynanabilir")
+            
         locks = m.get("bet_locks") or {}
-        if locks.get(it.bet_type):
-            raise HTTPException(400, f"Bu maçta {it.bet_type} bahsi kapatıldı")
+        # Check both category lock and specific selection lock
+        if locks.get(it.bet_type) or locks.get(it.selection) or locks.get(f"{it.bet_type}_{it.selection}"):
+            raise HTTPException(400, f"Bu seçim ({it.selection}) bahis alımına kapatılmış")
+            
         odds = m.get("odds") or {}
         odds_key = ODDS_KEYS[it.bet_type][it.selection]
         if odds_key not in odds:

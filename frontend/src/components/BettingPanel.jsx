@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Search, Lock, Sparkles, ShieldQuestion, X } from "lucide-react";
 import { useBetSlip } from "../context/BetSlipContext";
 import { CoinIcon, CoinAmount } from "./CoinIcon";
-import { BET_TYPE_LABEL, SELECTION_LABEL, SELECTION_SHORT, getOdd, getWallet, createCoupon, MIN_STAKE } from "../lib/betting";
+import { BET_TYPE_LABEL, SELECTION_LABEL, SELECTION_SHORT, ODDS_KEY, getOdd, getWallet, createCoupon, MIN_STAKE } from "../lib/betting";
 import api from "../lib/api";
 import { useNavigate } from "react-router-dom";
 import H2HModal from "./H2HModal";
@@ -79,28 +79,32 @@ function MatchBettingCard({ match, onSelect, isSelected, onOpenH2H }) {
       )}
       {bettable && (
         <div className="space-y-3">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-[color:var(--btg-muted)] mb-1 font-bold">Maç Sonucu</div>
-            <div className="odds-grid-3">
-              <OddButton label="1" odd={getOdd(odds, "MS", "1")} active={isSelected(match.id, "MS", "1")} disabled={locks.MS} onClick={() => onSelect(match, "MS", "1")} />
-              <OddButton label="X" odd={getOdd(odds, "MS", "X")} active={isSelected(match.id, "MS", "X")} disabled={locks.MS} onClick={() => onSelect(match, "MS", "X")} />
-              <OddButton label="2" odd={getOdd(odds, "MS", "2")} active={isSelected(match.id, "MS", "2")} disabled={locks.MS} onClick={() => onSelect(match, "MS", "2")} />
-            </div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-[color:var(--btg-muted)] mb-1 font-bold">Gol Alt / Üst (2.5)</div>
-            <div className="odds-grid-2">
-              <OddButton label="Üst 2.5" odd={getOdd(odds, "GOAL_O_U", "OVER_2_5")} active={isSelected(match.id, "GOAL_O_U", "OVER_2_5")} disabled={locks.GOAL_O_U} onClick={() => onSelect(match, "GOAL_O_U", "OVER_2_5")} />
-              <OddButton label="Alt 2.5" odd={getOdd(odds, "GOAL_O_U", "UNDER_2_5")} active={isSelected(match.id, "GOAL_O_U", "UNDER_2_5")} disabled={locks.GOAL_O_U} onClick={() => onSelect(match, "GOAL_O_U", "UNDER_2_5")} />
-            </div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-[color:var(--btg-muted)] mb-1 font-bold">Korner Alt / Üst (4.5)</div>
-            <div className="odds-grid-2">
-              <OddButton label="K.Üst 4.5" odd={getOdd(odds, "CORNER_O_U", "OVER_4_5")} active={isSelected(match.id, "CORNER_O_U", "OVER_4_5")} disabled={locks.CORNER_O_U} onClick={() => onSelect(match, "CORNER_O_U", "OVER_4_5")} />
-              <OddButton label="K.Alt 4.5" odd={getOdd(odds, "CORNER_O_U", "UNDER_4_5")} active={isSelected(match.id, "CORNER_O_U", "UNDER_4_5")} disabled={locks.CORNER_O_U} onClick={() => onSelect(match, "CORNER_O_U", "UNDER_4_5")} />
-            </div>
-          </div>
+          {Object.keys(ODDS_KEY).map(betType => {
+            const typeKeys = Object.keys(ODDS_KEY[betType]);
+            const hasAnyOdd = typeKeys.some(sel => getOdd(odds, betType, sel) != null);
+            if (!hasAnyOdd) return null;
+
+            return (
+              <div key={betType}>
+                <div className="text-[10px] uppercase tracking-wider text-[color:var(--btg-muted)] mb-1 font-bold">{BET_TYPE_LABEL[betType]}</div>
+                <div className={betType === "MS" ? "odds-grid-3" : "odds-grid-2"}>
+                  {typeKeys.map(sel => {
+                    const isLocked = locks[betType] || locks[sel] || locks[`${betType}_${sel}`];
+                    return (
+                      <OddButton
+                        key={sel}
+                        label={SELECTION_SHORT[sel]}
+                        odd={getOdd(odds, betType, sel)}
+                        active={isSelected(match.id, betType, sel)}
+                        disabled={isLocked}
+                        onClick={() => onSelect(match, betType, sel)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

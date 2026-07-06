@@ -6,20 +6,12 @@ import {
   generateOdds, overrideOdds, toggleBetLock,
   founderCoupons, founderUsers, founderStats,
   founderSetPoints, founderCancelCoupon, founderSetCouponStatus,
-  BET_TYPE_LABEL, SELECTION_LABEL,
+  BET_TYPE_LABEL, SELECTION_LABEL, ODDS_KEY,
 } from "../lib/betting";
 import api from "../lib/api";
 import "../betting.css";
 
-const ODDS_LABELS = {
-  ms_1: "MS 1",
-  ms_x: "MS X",
-  ms_2: "MS 2",
-  goal_over_2_5: "Üst 2.5",
-  goal_under_2_5: "Alt 2.5",
-  corner_over_4_5: "K.Üst 4.5",
-  corner_under_4_5: "K.Alt 4.5",
-};
+
 
 function StatCard({ icon: Icon, label, value, color = "var(--btg-primary-soft)" }) {
   return (
@@ -63,40 +55,51 @@ function OddsEditor({ match, onDone }) {
         <div className="font-bold text-sm truncate">{match.home?.name} vs {match.away?.name}</div>
         <span className="text-[10px] text-[color:var(--btg-muted)]">H{match.week || "?"}</span>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-        {Object.keys(ODDS_LABELS).map((k) => (
-          <div key={k}>
-            <div className="text-[10px] text-[color:var(--btg-muted)] font-bold uppercase">{ODDS_LABELS[k]}</div>
-            <input
-              type="number"
-              step="0.01"
-              min="1.05"
-              value={odds?.[k] ?? ""}
-              onChange={(e) => setOdds({ ...odds, [k]: parseFloat(e.target.value) || 0 })}
-              className="w-full bg-[color:var(--btg-surface)] border border-[color:var(--btg-border)] rounded-lg px-2 py-1.5 text-sm btg-num focus:outline-none focus:border-[color:var(--btg-primary)]"
-            />
-          </div>
+      
+      <div className="space-y-4 mb-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+        {Object.keys(ODDS_KEY).map(betType => (
+           <div key={betType}>
+              <div className="flex justify-between items-center mb-1">
+                 <div className="text-[11px] font-bold text-[color:var(--btg-primary-soft)]">{BET_TYPE_LABEL[betType]}</div>
+                 <button type="button" className={`text-[10px] px-2 py-0.5 rounded border ${match.bet_locks?.[betType] ? "bg-red-900/30 border-red-800 text-red-200" : "bg-[color:var(--btg-surface)] border-[color:var(--btg-border)]"}`} onClick={async () => {
+                   await toggleBetLock(match.id, betType, !match.bet_locks?.[betType]);
+                   onDone?.();
+                 }}>
+                   {match.bet_locks?.[betType] ? "Grup Kilitli" : "Grup Kilitle"}
+                 </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                 {Object.keys(ODDS_KEY[betType]).map(sel => {
+                    const k = ODDS_KEY[betType][sel];
+                    const isLocked = match.bet_locks?.[sel];
+                    return (
+                      <div key={sel} className="relative">
+                        <div className="flex justify-between items-center mb-0.5">
+                          <span className="text-[10px] text-[color:var(--btg-muted)] font-bold truncate pr-1">{SELECTION_LABEL[sel]}</span>
+                          <button type="button" onClick={async () => {
+                             await toggleBetLock(match.id, sel, !isLocked);
+                             onDone?.();
+                          }}>
+                             {isLocked ? <Lock className="w-3 h-3 text-red-400" /> : <Unlock className="w-3 h-3 text-[color:var(--btg-muted)] opacity-50 hover:opacity-100" />}
+                          </button>
+                        </div>
+                        <input
+                          type="number" step="0.01" min="1.01"
+                          value={odds?.[k] ?? ""}
+                          onChange={(e) => setOdds({ ...odds, [k]: parseFloat(e.target.value) || 0 })}
+                          className={`w-full bg-[color:var(--btg-surface)] border ${isLocked ? 'border-red-900/50 opacity-50 text-red-200' : 'border-[color:var(--btg-border)]'} rounded-lg px-2 py-1 text-xs btg-num focus:outline-none focus:border-[color:var(--btg-primary)]`}
+                        />
+                      </div>
+                    )
+                 })}
+              </div>
+           </div>
         ))}
       </div>
+      
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={gen} disabled={busy} className="btg-pill flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> AI Üret</button>
-        <button type="button" onClick={save} disabled={busy} className="btg-cta text-xs px-4 py-1.5">Kaydet</button>
-        <div className="flex items-center gap-1.5 ml-auto">
-          {["MS", "GOAL_O_U", "CORNER_O_U"].map((bt) => {
-            const locked = !!match.bet_locks?.[bt];
-            return (
-              <button key={bt} type="button" onClick={async () => {
-                try {
-                  await toggleBetLock(match.id, bt, !locked);
-                  toast.success(!locked ? `${BET_TYPE_LABEL[bt]} kapatıldı` : `${BET_TYPE_LABEL[bt]} açıldı`);
-                  onDone?.();
-                } catch (e) { toast.error(e?.response?.data?.detail || "Hata"); }
-              }} className={`btg-tab text-[10px] ${locked ? "active" : ""}`} title={`${BET_TYPE_LABEL[bt]} ${locked ? "KAPALI" : "AÇIK"}`}>
-                {locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />} {bt === "MS" ? "MS" : bt === "GOAL_O_U" ? "Gol" : "Korner"}
-              </button>
-            );
-          })}
-        </div>
+        <button type="button" onClick={save} disabled={busy} className="btg-cta text-xs px-4 py-1.5 ml-auto">Kaydet</button>
       </div>
     </div>
   );
