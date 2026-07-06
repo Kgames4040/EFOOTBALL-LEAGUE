@@ -2,6 +2,7 @@ import os
 import uuid
 import random
 import logging
+import time
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -101,6 +102,11 @@ class TournamentReq(BaseModel):
     mode: str = "league"  # "league" | "cup"
 
 
+class TournamentUpdateReq(BaseModel):
+    name: Optional[str] = None
+    cover_url: Optional[str] = None
+
+
 class CupResultReq(BaseModel):
     home_score: int
     away_score: int
@@ -163,6 +169,7 @@ class MatchMagazineReq(BaseModel):
     body: str = ""
     image_url: str = ""
     video_url: str = ""
+    mentions: Optional[List[MentionItem]] = []
 
 
 class PoolClubReq(BaseModel):
@@ -474,6 +481,26 @@ async def resume_tournament(admin: dict = Depends(require_founder)):
     return {"status": "running"}
 
 
+@api.put("/admin/tournament")
+async def update_tournament(req: TournamentUpdateReq, admin: dict = Depends(require_founder)):
+    t = await active_tournament()
+    if not t:
+        raise HTTPException(404, "Aktif turnuva yok")
+    updates = {}
+    if req.name is not None:
+        nm = req.name.strip()
+        if not nm:
+            raise HTTPException(400, "İsim boş olamaz")
+        updates["name"] = nm
+    if req.cover_url is not None:
+        updates["cover_url"] = req.cover_url
+    if not updates:
+        return t
+    await db.tournaments.update_one({"id": t["id"]}, {"$set": updates})
+    updated = await db.tournaments.find_one({"id": t["id"]}, {"_id": 0})
+    return updated
+
+
 @api.delete("/admin/tournament")
 async def delete_tournament(admin: dict = Depends(require_founder)):
     t = await active_tournament()
@@ -506,10 +533,25 @@ def round_robin(team_ids: List[str]):
         teams = [teams[0]] + [teams[-1]] + teams[1:-1]
     return rounds
 
+_team_cache = {}
+_team_cache_time = {}
+
+async def get_team_cached(team_id: str):
+    if not team_id:
+        return None
+    now = time.time()
+    if team_id in _team_cache and now - _team_cache_time.get(team_id, 0) < 60:
+        return _team_cache[team_id]
+        
+    t = await db.teams.find_one({"id": team_id}, {"_id": 0, "id": 1, "name": 1, "abbreviation": 1, "logo_url": 1})
+    res = t or {"id": team_id, "name": "?", "abbreviation": "???", "logo_url": ""}
+    _team_cache[team_id] = res
+    _team_cache_time[team_id] = now
+    return res
 
 async def build_match_view(m: dict):
-    home = await db.teams.find_one({"id": m["home_team_id"]}, {"_id": 0, "name": 1, "abbreviation": 1, "logo_url": 1})
-    away = await db.teams.find_one({"id": m["away_team_id"]}, {"_id": 0, "name": 1, "abbreviation": 1, "logo_url": 1})
+    home = await get_team_cached(m["home_team_id"])
+    away = await get_team_cached(m["away_team_id"])
     return {
         "id": m["id"],
         "week": m["week"],
@@ -756,10 +798,7 @@ async def delete_exhibition(match_id: str, admin: dict = Depends(require_founder
 
 # ----------------------------- Cup (knockout) -----------------------------
 async def team_lite(team_id):
-    if not team_id:
-        return None
-    t = await db.teams.find_one({"id": team_id}, {"_id": 0, "id": 1, "name": 1, "abbreviation": 1, "logo_url": 1})
-    return t or {"id": team_id, "name": "?", "abbreviation": "???", "logo_url": ""}
+    return await get_team_cached(team_id)
 
 
 def cup_round_label(num_teams: int):
@@ -1434,7 +1473,7 @@ async def publish_magazine(tournament_id, title, body="", image_url="", is_leade
     await db.magazine.insert_one(dict(doc))
     doc.pop("_id", None)
     if url is None:
-        url = f"/match/{match_id}" if match_id else f"/?magazine={doc_id}"
+        url = f"/match/{match_id}" if match_id else f"/magazine/{doc_id}"
     if push:
         await broadcast_push(f"📰 {title}", (body or "")[:140] or "Yeni haber yayınlandı", url)
     return doc
@@ -1463,7 +1502,16 @@ async def add_match_magazine(match_id: str, req: MatchMagazineReq, user: dict = 
     return await publish_magazine(
         t_id, req.title, req.body, req.image_url, False,
         video_url=req.video_url, match_id=match_id,
+        mentions=[mm.model_dump() for mm in (req.mentions or [])],
     )
+
+
+@api.get("/magazine/{item_id}")
+async def get_magazine_item(item_id: str):
+    item = await db.magazine.find_one({"id": item_id}, {"_id": 0})
+    if not item:
+        raise HTTPException(404, "Haber bulunamadı")
+    return item
 
 
 @api.get("/mention-targets")
@@ -1471,6 +1519,12 @@ async def mention_targets(user: dict = Depends(require_founder)):
     targets = [
         {"type": "page", "label": "Ana Sayfa", "url": "/", "default_tag": "Ana Sayfa", "ref_id": ""},
         {"type": "page", "label": "Takımlar", "url": "/teams", "default_tag": "Takımlar", "ref_id": ""},
+        # Fullscreen section deep-links (Dashboard opens the corresponding modal via ?section=)
+        {"type": "section", "label": "Fikstür (Tam Ekran)", "url": "/?section=fixture", "default_tag": "Fikstür Bölümü", "ref_id": "fixture"},
+        {"type": "section", "label": "Puan Durumu (Tam Ekran)", "url": "/?section=standings", "default_tag": "Puan Durumu", "ref_id": "standings"},
+        {"type": "section", "label": "Kupa Ağacı (Tam Ekran)", "url": "/?section=cup", "default_tag": "Kupa Ağacı", "ref_id": "cup"},
+        {"type": "section", "label": "Gösteri Maçları", "url": "/?section=exhibition", "default_tag": "Gösteri Maçları", "ref_id": "exhibition"},
+        {"type": "section", "label": "Magazin Arşivi", "url": "/?section=magazine", "default_tag": "Magazin", "ref_id": "magazine"},
     ]
     teams = await db.teams.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(500)
     for t in teams:
@@ -1663,6 +1717,17 @@ async def root():
 @api.get("/health")
 async def health():
     return {"status": "ok", "time": now_iso()}
+
+
+@api.get("/keepalive")
+async def keepalive():
+    # Lightweight endpoint to keep Render free-tier from sleeping (external cron or in-app ping)
+    try:
+        await db.command("ping")
+        db_ok = True
+    except Exception:
+        db_ok = False
+    return {"status": "alive", "db": db_ok, "time": now_iso()}
 
 
 # ----------------------------- Branding (founder) -----------------------------
