@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { MatchRow } from "./FixtureScroll";
+import { Last5 } from "./StandingsTable";
 
 export function useIsDesktop() {
   const [desktop, setDesktop] = useState(() => (typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : true));
@@ -49,11 +50,11 @@ export function StandingsPreview({ rows }) {
   }
   return (
     <div className="space-y-1.5" data-testid="standings-preview-list">
-      <div className="grid grid-cols-[1.5rem_1fr_2rem_2rem] gap-2 label-xs px-1">
-        <span>#</span><span>Takım</span><span className="text-center">O</span><span className="text-center neon-text-blue">P</span>
+      <div className="grid grid-cols-[1.25rem_1fr_1.75rem_1.75rem_auto] gap-1.5 label-xs px-1">
+        <span>#</span><span>Takım</span><span className="text-center">O</span><span className="text-center neon-text-blue">P</span><span className="text-center">Son 5</span>
       </div>
       {rows.slice(0, 4).map((r, i) => (
-        <div key={r.team_id} className="grid grid-cols-[1.5rem_1fr_2rem_2rem] gap-2 items-center bg-white/[0.03] rounded-lg px-1 py-1.5">
+        <div key={r.team_id} className="grid grid-cols-[1.25rem_1fr_1.75rem_1.75rem_auto] gap-1.5 items-center bg-white/[0.03] rounded-lg px-1 py-1.5">
           <span className={`font-heading text-sm ${i === 0 ? "neon-text-green" : "text-zinc-400"}`}>{r.rank}</span>
           <div className="flex items-center gap-2 min-w-0">
             {r.logo_url ? (
@@ -65,6 +66,7 @@ export function StandingsPreview({ rows }) {
           </div>
           <span className="text-center text-sm text-zinc-300">{r.OM}</span>
           <span className="text-center font-heading font-bold text-white">{r.P}</span>
+          <Last5 seq={r.last5} />
         </div>
       ))}
       {rows.length > 4 && <div className="text-[11px] text-zinc-500 text-center pt-1">+{rows.length - 4} takım · tümünü görmek için dokun</div>}

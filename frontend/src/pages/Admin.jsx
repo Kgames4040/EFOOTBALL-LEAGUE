@@ -100,6 +100,7 @@ function TournamentTab({ tournament, onChange }) {
   const [cover, setCover] = useState("");
   const [mode, setMode] = useState("league");
   const [busy, setBusy] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const start = async () => {
     if (!name.trim()) return toast.error(mode === "cup" ? "Kupa adı gerekli" : "Turnuva adı gerekli");
@@ -150,8 +151,11 @@ function TournamentTab({ tournament, onChange }) {
           ) : (
             <button onClick={() => action("/admin/tournament/pause", "Durduruldu")} data-testid="pause-btn" className="rounded-full px-5 py-2.5 flex items-center gap-2 bg-yellow-500/15 border border-yellow-500/40 text-yellow-300 hover:bg-yellow-500/25 transition-colors"><PauseCircle className="w-4 h-4" /> Durdur</button>
           )}
+          <button onClick={() => setEditOpen(true)} data-testid="edit-tournament-btn" className="rounded-full px-5 py-2.5 flex items-center gap-2 bg-neon-blue/15 border border-neon-blue/40 neon-text-blue hover:bg-neon-blue/25 transition-colors"><Pencil className="w-4 h-4" /> Düzenle</button>
           <button onClick={del} data-testid="delete-tournament-btn" className="rounded-full px-5 py-2.5 flex items-center gap-2 bg-red-500/15 border border-red-500/40 text-red-300 hover:bg-red-500/25 transition-colors"><Trash2 className="w-4 h-4" /> Tamamen Sil</button>
         </div>
+
+        <EditTournamentDialog open={editOpen} onClose={() => setEditOpen(false)} tournament={tournament} onSaved={onChange} />
       </Section>
     );
   }
@@ -181,6 +185,76 @@ function TournamentTab({ tournament, onChange }) {
     </Section>
   );
 }
+
+function EditTournamentDialog({ open, onClose, tournament, onSaved }) {
+  const [name, setName] = useState("");
+  const [cover, setCover] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open && tournament) {
+      setName(tournament.name || "");
+      setCover(tournament.cover_url || "");
+    }
+  }, [open, tournament]);
+
+  const save = async () => {
+    if (!name.trim()) return toast.error("İsim boş olamaz");
+    setBusy(true);
+    try {
+      await api.put("/admin/tournament", { name: name.trim(), cover_url: cover || "" });
+      toast.success("Turnuva güncellendi");
+      onSaved && onSaved();
+      onClose();
+    } catch (e) {
+      toast.error(formatError(e.response?.data?.detail));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="glass-strong border-white/10 text-white sm:max-w-lg" data-testid="edit-tournament-dialog">
+        <DialogHeader>
+          <DialogTitle className="font-heading text-xl flex items-center gap-2">
+            <Pencil className="w-5 h-5 text-neon-blue" /> Turnuvayı Düzenle
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 mt-2">
+          <div>
+            <span className="label-xs">Turnuva Adı</span>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              data-testid="edit-tournament-name-input"
+              className="mt-1 bg-white/5 border-white/15"
+            />
+          </div>
+          <ImageUpload value={cover} onChange={setCover} label="Kapak Görseli" testid="edit-tournament-cover" />
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full px-4 py-2 text-sm bg-white/5 hover:bg-white/10"
+            >
+              İptal
+            </button>
+            <button
+              onClick={save}
+              disabled={busy}
+              data-testid="save-tournament-edit-btn"
+              className="btn-primary rounded-full px-5 py-2 flex items-center gap-2 text-sm"
+            >
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Kaydet
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 /* ---------------- Cup Management ---------------- */
 function CupTab({ tournament, onChange }) {

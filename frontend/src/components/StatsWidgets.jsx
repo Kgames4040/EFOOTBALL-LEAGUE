@@ -1,5 +1,6 @@
 import React from "react";
 import { Trophy, Target, Crown, Newspaper, PlayCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export function ScorerWidget({ title, items, icon: Icon, color }) {
   return (
@@ -52,6 +53,11 @@ export function LeaderHighlight({ leader }) {
 }
 
 export function MagazineFeed({ items, onOpenAll, onSelect }) {
+  const navigate = useNavigate();
+  const handleSelect = (it) => {
+    if (onSelect) return onSelect(it);
+    navigate(`/magazine/${it.id}`);
+  };
   return (
     <div className="glass rounded-2xl p-4" data-testid="magazine-feed">
       <div className="flex items-center justify-between mb-3">
@@ -66,7 +72,7 @@ export function MagazineFeed({ items, onOpenAll, onSelect }) {
       {(!items || items.length === 0) && <div className="text-xs text-zinc-500">Henüz haber yok.</div>}
       <div className="space-y-3">
         {(items || []).slice(0, 6).map((it) => (
-          <button key={it.id} onClick={() => onSelect && onSelect(it)} data-testid={`magazine-item-${it.id}`} className="block w-full text-left border-l-2 border-neon-blue/40 pl-3 hover:border-neon-blue transition-colors">
+          <button key={it.id} onClick={() => handleSelect(it)} data-testid={`magazine-item-${it.id}`} className="block w-full text-left border-l-2 border-neon-blue/40 pl-3 hover:border-neon-blue transition-colors">
             {it.video_url ? (
               <div className="relative w-full h-24 rounded-lg mb-2 overflow-hidden bg-black/40 flex items-center justify-center">
                 {it.image_url && <img src={it.image_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-60" />}

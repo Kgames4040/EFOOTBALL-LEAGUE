@@ -1,24 +1,37 @@
 import React from "react";
-import { Check, X } from "lucide-react";
+import { Check, X, Minus } from "lucide-react";
 
 function Last5({ seq }) {
   return (
-    <div className="flex items-center gap-1 justify-center">
+    <div className="flex items-center gap-1 justify-center" data-testid="last5">
       {(seq || []).length === 0 && <span className="text-zinc-600 text-xs">—</span>}
       {(seq || []).map((r, i) => (
         <span
           key={i}
-          className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${
-            r === "W" ? "bg-neon-green/20 text-neon-green" : r === "L" ? "bg-red-500/20 text-red-400" : "bg-zinc-500/20 text-zinc-300"
+          data-testid={`last5-${r}`}
+          className={`inline-flex items-center justify-center w-4 h-4 rounded-full border ${
+            r === "W"
+              ? "bg-neon-green/20 text-neon-green border-neon-green/40 shadow-[0_0_6px_rgba(57,255,20,0.4)]"
+              : r === "L"
+              ? "bg-red-500/20 text-red-400 border-red-500/40"
+              : "bg-zinc-500/20 text-zinc-400 border-zinc-500/40"
           }`}
           title={r === "W" ? "Galibiyet" : r === "L" ? "Mağlubiyet" : "Beraberlik"}
         >
-          {r === "W" ? <Check className="w-2.5 h-2.5" /> : r === "L" ? <X className="w-2.5 h-2.5" /> : <span className="text-[8px]">•</span>}
+          {r === "W" ? (
+            <Check className="w-2.5 h-2.5" strokeWidth={3} />
+          ) : r === "L" ? (
+            <X className="w-2.5 h-2.5" strokeWidth={3} />
+          ) : (
+            <Minus className="w-2.5 h-2.5" strokeWidth={3} />
+          )}
         </span>
       ))}
     </div>
   );
 }
+
+export { Last5 };
 
 // hideMobile cols collapse on small screens so the table always fits the phone width.
 const COLS = [
@@ -46,7 +59,7 @@ export function StandingsTable({ rows }) {
               <th key={c.k} className={`py-2 px-1 sm:px-1.5 text-center ${c.hideMobile ? "hidden sm:table-cell" : ""}`}>{c.t}</th>
             ))}
             <th className="py-2 px-1 sm:px-1.5 text-center neon-text-blue">P</th>
-            <th className="py-2 px-1 sm:px-2 text-center hidden xs:table-cell">Son 5</th>
+            <th className="py-2 px-1 sm:px-2 text-center">Son 5</th>
           </tr>
         </thead>
         <tbody>
@@ -73,7 +86,7 @@ export function StandingsTable({ rows }) {
                 <td key={c.k} className={`py-2.5 px-1 sm:px-1.5 text-center text-zinc-300 ${c.hideMobile ? "hidden sm:table-cell" : ""}`}>{r[c.k]}</td>
               ))}
               <td className="py-2.5 px-1 sm:px-1.5 text-center font-heading font-bold text-white">{r.P}</td>
-              <td className="py-2.5 px-1 sm:px-2 hidden xs:table-cell"><Last5 seq={r.last5} /></td>
+              <td className="py-2.5 px-1 sm:px-2"><Last5 seq={r.last5} /></td>
             </tr>
           ))}
         </tbody>

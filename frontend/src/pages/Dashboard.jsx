@@ -10,6 +10,7 @@ import { ExpandableSection, StandingsPreview, FixturePreview } from "../componen
 import { CupBracket, CupSummaryModal } from "../components/CupBracket";
 import { FullscreenModal } from "../components/FullscreenModal";
 import { useAuth } from "../context/AuthContext";
+import { tournamentCover } from "../lib/image";
 import api from "../lib/api";
 import { Trophy, PauseCircle, CalendarDays, Sparkles, ShieldHalf, Maximize2 } from "lucide-react";
 
@@ -77,18 +78,28 @@ export default function Dashboard() {
 
   useEffect(() => {
     const mid = searchParams.get("magazine");
-    if (mid && magazine.length > 0) {
-      const item = magazine.find((m) => m.id === mid);
-      if (item) {
-        setSelected(item);
-        setArchiveOpen(true);
-        const sp = new URLSearchParams(searchParams);
-        sp.delete("magazine");
-        setSearchParams(sp, { replace: true });
+    if (mid) {
+      // Old query pattern → redirect to dedicated detail page.
+      navigate(`/magazine/${mid}`, { replace: true });
+      return;
+    }
+    const section = searchParams.get("section");
+    if (section) {
+      if (section === "standings") setStandingsFull(true);
+      else if (section === "fixture") setFixtureFull(true);
+      else if (section === "cup") setSummaryOpen(true);
+      else if (section === "magazine") { setSelected(null); setArchiveOpen(true); }
+      else if (section === "exhibition") {
+        // Scroll into view if exhibition section exists.
+        const el = typeof document !== "undefined" ? document.querySelector('[data-testid="exhibition-section"]') : null;
+        if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
       }
+      const sp = new URLSearchParams(searchParams);
+      sp.delete("section");
+      setSearchParams(sp, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [magazine, searchParams]);
+  }, [searchParams]);
 
   if (loading) {
     return <Layout><div className="text-center text-zinc-500 py-20">Yükleniyor...</div></Layout>;
@@ -119,16 +130,30 @@ export default function Dashboard() {
   const isCup = tournament.mode === "cup";
 
   const Hero = (
-    <div className="relative rounded-3xl overflow-hidden glass mb-6">
-      {tournament.cover_url && <img src={tournament.cover_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />}
+    <div className="relative rounded-3xl overflow-hidden glass mb-6" data-testid="tournament-hero">
+      {tournament.cover_url && (
+        <div className="absolute inset-0">
+          <img src={tournamentCover(tournament.cover_url)} alt="" className="w-full h-full object-cover opacity-30" />
+        </div>
+      )}
       <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
-      <div className="relative p-5 sm:p-8">
-        <span className="label-xs neon-text-green">{isCup ? "Aktif Kupa" : "Aktif Turnuva"}</span>
-        <h1 className="font-heading text-3xl sm:text-5xl mt-1 flex items-center gap-3">
-          {isCup ? <ShieldHalf className="w-7 h-7 sm:w-8 sm:h-8 text-neon-blue" /> : <Trophy className="w-7 h-7 sm:w-8 sm:h-8 text-yellow-400" />}
-          {tournament.name}
-        </h1>
-        <p className="text-zinc-400 text-sm mt-1">{isCup ? "Eleme Usulü Kupa · Tek Maç" : `${tournament.weeks} Hafta · Çift Devreli Lig`}</p>
+      <div className="relative p-5 sm:p-8 flex items-center gap-4 sm:gap-5">
+        {tournament.cover_url && (
+          <img
+            src={tournamentCover(tournament.cover_url)}
+            alt=""
+            className="hidden sm:block w-24 h-24 rounded-2xl object-cover border border-white/10 shadow-[0_0_18px_rgba(0,245,255,0.25)] shrink-0"
+            data-testid="tournament-hero-image"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <span className="label-xs neon-text-green">{isCup ? "Aktif Kupa" : "Aktif Turnuva"}</span>
+          <h1 className="font-heading text-3xl sm:text-5xl mt-1 flex items-center gap-3">
+            {isCup ? <ShieldHalf className="w-7 h-7 sm:w-8 sm:h-8 text-neon-blue" /> : <Trophy className="w-7 h-7 sm:w-8 sm:h-8 text-yellow-400" />}
+            <span className="truncate">{tournament.name}</span>
+          </h1>
+          <p className="text-zinc-400 text-sm mt-1">{isCup ? "Eleme Usulü Kupa · Tek Maç" : `${tournament.weeks} Hafta · Çift Devreli Lig`}</p>
+        </div>
       </div>
     </div>
   );
