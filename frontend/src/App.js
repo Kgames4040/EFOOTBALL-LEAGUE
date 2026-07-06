@@ -1,8 +1,6 @@
 import "@/App.css";
-import "@/betting.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth, isStaff } from "@/context/AuthContext";
-import { BetSlipProvider } from "@/context/BetSlipContext";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import Login from "@/pages/Login";
 import Onboarding from "@/pages/Onboarding";
@@ -13,8 +11,6 @@ import TeamDetail from "@/pages/TeamDetail";
 import Admin from "@/pages/Admin";
 import MatchTracking from "@/pages/MatchTracking";
 import MagazineDetail from "@/pages/MagazineDetail";
-import BettingPage from "@/pages/BettingPage";
-import MyCouponsRoutePage from "@/pages/MyCouponsRoutePage";
 import { useBackendKeepalive } from "@/lib/keepalive";
 import { Loader2 } from "lucide-react";
 
@@ -49,25 +45,21 @@ function App() {
     <div className="App">
       <BrowserRouter>
         <AuthProvider>
-          <BetSlipProvider>
-            <ConfirmProvider>
-              <KeepaliveHost />
-              <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/onboarding" element={<Protected><Onboarding /></Protected>} />
-                <Route path="/" element={<RootRoute />} />
-                <Route path="/my-team" element={<Protected><MyTeam /></Protected>} />
-                <Route path="/teams" element={<Protected><Teams /></Protected>} />
-                <Route path="/teams/:id" element={<Protected><TeamDetail /></Protected>} />
-                <Route path="/match/:id" element={<Protected><MatchTracking /></Protected>} />
-                <Route path="/magazine/:id" element={<Protected><MagazineDetail /></Protected>} />
-                <Route path="/betting" element={<Protected><BettingPage /></Protected>} />
-                <Route path="/my-coupons" element={<Protected><MyCouponsRoutePage /></Protected>} />
-                <Route path="/admin" element={<Protected adminOnly><Admin /></Protected>} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </ConfirmProvider>
-          </BetSlipProvider>
+          <ConfirmProvider>
+            <KeepaliveHost />
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/onboarding" element={<Protected><Onboarding /></Protected>} />
+              <Route path="/" element={<RootRoute />} />
+              <Route path="/my-team" element={<Protected><MyTeam /></Protected>} />
+              <Route path="/teams" element={<Protected><Teams /></Protected>} />
+              <Route path="/teams/:id" element={<Protected><TeamDetail /></Protected>} />
+              <Route path="/match/:id" element={<Protected><MatchTracking /></Protected>} />
+              <Route path="/magazine/:id" element={<Protected><MagazineDetail /></Protected>} />
+              <Route path="/admin" element={<Protected adminOnly><Admin /></Protected>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </ConfirmProvider>
         </AuthProvider>
       </BrowserRouter>
     </div>

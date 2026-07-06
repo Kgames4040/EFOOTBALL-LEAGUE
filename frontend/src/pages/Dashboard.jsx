@@ -9,29 +9,12 @@ import { MagazineArchive } from "../components/MagazineArchive";
 import { ExpandableSection, StandingsPreview, FixturePreview } from "../components/HomeSections";
 import { CupBracket, CupSummaryModal } from "../components/CupBracket";
 import { FullscreenModal } from "../components/FullscreenModal";
-import H2HModal from "../components/H2HModal";
 import { useAuth } from "../context/AuthContext";
 import { tournamentCover } from "../lib/image";
 import api from "../lib/api";
-import { Trophy, PauseCircle, CalendarDays, Sparkles, ShieldHalf, Maximize2, Zap, Radio } from "lucide-react";
-
-function SectionSwitcher({ active, onChange }) {
-  return (
-    <div className="flex justify-center mb-4">
-      <div className="section-switcher">
-        <button type="button" onClick={() => onChange("live")} className={active === "live" ? "active" : ""} data-testid="section-switch-live">
-          <Radio className="w-3.5 h-3.5" /> CANLI SONUÇLAR
-        </button>
-        <button type="button" onClick={() => onChange("betting")} className={active === "betting" ? "active" : ""} data-testid="section-switch-betting">
-          <Zap className="w-3.5 h-3.5" /> BAHİS
-        </button>
-      </div>
-    </div>
-  );
-}
+import { Trophy, PauseCircle, CalendarDays, Sparkles, ShieldHalf, Maximize2 } from "lucide-react";
 
 function ExhibitionSection({ matches }) {
-  const [h2h, setH2h] = React.useState(null);
   if (!matches || matches.length === 0) return null;
   return (
     <section className="glass rounded-3xl p-4 sm:p-5" data-testid="exhibition-section">
@@ -39,9 +22,8 @@ function ExhibitionSection({ matches }) {
         <Sparkles className="w-5 h-5 text-neon-blue" /> GÖSTERİ MAÇLARI
       </h3>
       <div className="space-y-2">
-        {matches.map((m) => <MatchRow key={m.id} m={m} onScheduledClick={(match) => match?.home_team_id && match?.away_team_id && setH2h({ a: match.home_team_id, b: match.away_team_id })} />)}
+        {matches.map((m) => <MatchRow key={m.id} m={m} />)}
       </div>
-      {h2h && <H2HModal teamA={h2h.a} teamB={h2h.b} onClose={() => setH2h(null)} />}
     </section>
   );
 }
@@ -150,21 +132,19 @@ export default function Dashboard() {
   const Hero = (
     <div className="relative rounded-3xl overflow-hidden glass mb-6" data-testid="tournament-hero">
       {tournament.cover_url && (
-        <div className="absolute inset-0">
-          <img src={tournamentCover(tournament.cover_url)} alt="" className="w-full h-full object-cover opacity-30" />
+        <div className="absolute inset-0 overflow-hidden">
+          <img src={tournamentCover(tournament.cover_url)} alt="" className="w-full h-full object-cover opacity-30 blur-3xl scale-125" />
         </div>
       )}
       <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
       <div className="relative p-5 sm:p-8 flex items-center gap-4 sm:gap-5">
-        {(tournament.square_logo_url || tournament.cover_url) && (
-          <div className="hidden sm:flex w-24 h-24 rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_18px_rgba(0,245,255,0.25)] shrink-0 bg-black/40 items-center justify-center">
-            <img
-              src={tournamentCover(tournament.square_logo_url || tournament.cover_url)}
-              alt=""
-              className="w-full h-full object-contain"
-              data-testid="tournament-hero-image"
-            />
-          </div>
+        {tournament.cover_url && (
+          <img
+            src={tournamentCover(tournament.cover_url)}
+            alt=""
+            className="hidden sm:block w-24 h-24 rounded-2xl object-contain bg-black/40 border border-white/10 shadow-[0_0_18px_rgba(0,245,255,0.25)] shrink-0 p-1"
+            data-testid="tournament-hero-image"
+          />
         )}
         <div className="min-w-0 flex-1">
           <span className="label-xs neon-text-green">{isCup ? "Aktif Kupa" : "Aktif Turnuva"}</span>
@@ -191,7 +171,6 @@ export default function Dashboard() {
   if (isCup) {
     return (
       <Layout>
-        <SectionSwitcher active="live" onChange={(s) => { if (s === "betting") navigate("/betting"); }} />
         {Hero}
         {PausedBanner}
         <div className="grid lg:grid-cols-3 gap-6">
@@ -215,7 +194,6 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <SectionSwitcher active="live" onChange={(s) => { if (s === "betting") navigate("/betting"); }} />
       {Hero}
       {PausedBanner}
 

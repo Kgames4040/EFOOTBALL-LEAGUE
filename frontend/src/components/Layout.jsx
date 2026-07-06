@@ -1,13 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Menu, Home, Users, Shield, LogOut, Bell, Sparkles, RotateCw, ChevronDown, Ticket, Zap } from "lucide-react";
+import { Menu, Home, Users, Shield, LogOut, Bell, Sparkles, RotateCw, ChevronDown } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { useAuth } from "../context/AuthContext";
 import { enablePush } from "../lib/push";
 import { ProfileDialog } from "./ProfileDialog";
 import { toast } from "sonner";
-import { CoinIcon } from "./CoinIcon";
-import { getWallet } from "../lib/betting";
 
 function NavItem({ icon: Icon, label, onClick, active, testid }) {
   return (
@@ -30,21 +28,9 @@ export function Layout({ children }) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [wallet, setWallet] = useState(null);
   const appName = branding?.app_name || "eFootball Lig";
   const logoSrc = branding?.logo_url || "/icon-192.png";
   const staff = user?.role === "admin" || user?.role === "founder";
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    const load = async () => {
-      try { const w = await getWallet(); if (!cancelled) setWallet(w); } catch { /* ignore */ }
-    };
-    load();
-    const id = setInterval(load, 30000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, [user, location.pathname]);
 
   const go = (path) => {
     setOpen(false);
@@ -88,8 +74,6 @@ export function Layout({ children }) {
                     <NavItem icon={Shield} label="Takımım" testid="nav-myteam" active={location.pathname === "/my-team"} onClick={() => go("/my-team")} />
                   )}
                   <NavItem icon={Users} label="Takımlar" testid="nav-teams" active={location.pathname.startsWith("/teams")} onClick={() => go("/teams")} />
-                  <NavItem icon={Zap} label="Bahis" testid="nav-betting" active={location.pathname === "/betting"} onClick={() => go("/betting")} />
-                  <NavItem icon={Ticket} label="Kuponlarım" testid="nav-my-coupons" active={location.pathname === "/my-coupons"} onClick={() => go("/my-coupons")} />
                   {staff && (
                     <NavItem icon={Sparkles} label={user?.role === "founder" ? "Kurucu Paneli" : "Admin Paneli"} testid="nav-admin" active={location.pathname === "/admin"} onClick={() => go("/admin")} />
                   )}
@@ -118,17 +102,6 @@ export function Layout({ children }) {
             >
               <RotateCw className="w-5 h-5 text-neon-blue" />
             </button>
-            {wallet != null && (
-              <button
-                onClick={() => navigate("/betting")}
-                data-testid="header-wallet"
-                title="Bahis bakiyen"
-                className="flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full border border-cyan-300/40 bg-cyan-300/10 hover:bg-cyan-300/15 transition-colors"
-              >
-                <CoinIcon size={22} />
-                <span className="font-bold text-sm text-cyan-200 font-mono">{Number(wallet).toLocaleString("tr-TR")}</span>
-              </button>
-            )}
             {team && (
               <div className="text-right hidden xs:block">
                 <div className="label-xs">Takım Değeri</div>

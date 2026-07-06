@@ -27,7 +27,6 @@ from auth import (
     require_staff,
 )
 from media import generate_cloudinary_signature, broadcast_push
-from betting import router as betting_router, on_match_finished as betting_on_match_finished, ensure_all_users_have_points
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -100,22 +99,18 @@ class TournamentReq(BaseModel):
     name: str
     weeks: int = 1
     cover_url: str = ""
-    square_logo_url: str = ""
     mode: str = "league"  # "league" | "cup"
 
 
 class TournamentUpdateReq(BaseModel):
     name: Optional[str] = None
     cover_url: Optional[str] = None
-    square_logo_url: Optional[str] = None
 
 
 class CupResultReq(BaseModel):
     home_score: int
     away_score: int
     pen_winner_team_id: Optional[str] = None
-    home_corners: Optional[int] = None
-    away_corners: Optional[int] = None
 
 
 class ManualMatch(BaseModel):
@@ -132,8 +127,6 @@ class ManualFixtureReq(BaseModel):
 class FinishReq(BaseModel):
     home_score: int
     away_score: int
-    home_corners: Optional[int] = None
-    away_corners: Optional[int] = None
 
 
 class MatchEditReq(BaseModel):
@@ -141,8 +134,6 @@ class MatchEditReq(BaseModel):
     away_score: Optional[int] = None
     scheduled_time: Optional[str] = None
     status: Optional[str] = None
-    home_corners: Optional[int] = None
-    away_corners: Optional[int] = None
 
 
 class LeaderEntry(BaseModel):
@@ -461,7 +452,6 @@ async def start_tournament(req: TournamentReq, admin: dict = Depends(require_fou
         "name": req.name.strip(),
         "weeks": max(1, req.weeks),
         "cover_url": req.cover_url,
-        "square_logo_url": req.square_logo_url,
         "mode": mode,
         "status": "running",
         "champion_team_id": None,
@@ -504,8 +494,6 @@ async def update_tournament(req: TournamentUpdateReq, admin: dict = Depends(requ
         updates["name"] = nm
     if req.cover_url is not None:
         updates["cover_url"] = req.cover_url
-    if req.square_logo_url is not None:
-        updates["square_logo_url"] = req.square_logo_url
     if not updates:
         return t
     await db.tournaments.update_one({"id": t["id"]}, {"$set": updates})
@@ -582,10 +570,6 @@ async def build_match_view(m: dict):
         "live_away": m.get("live_away", 0),
         "finished_at": m.get("finished_at"),
         "cancel_reason": m.get("cancel_reason", ""),
-        "home_corners": m.get("home_corners"),
-        "away_corners": m.get("away_corners"),
-        "odds": m.get("odds") or None,
-        "bet_locks": m.get("bet_locks") or {},
     }
 
 
@@ -695,29 +679,21 @@ async def finish_match(match_id: str, req: FinishReq, admin: dict = Depends(requ
     m = await db.matches.find_one({"id": match_id})
     if not m:
         raise HTTPException(404, "Maç bulunamadı")
-    update = {
-        "status": "finished",
-        "home_score": req.home_score,
-        "away_score": req.away_score,
-        "finished_at": now_iso(),
-    }
-    if req.home_corners is not None:
-        update["home_corners"] = int(req.home_corners)
-    if req.away_corners is not None:
-        update["away_corners"] = int(req.away_corners)
-    await db.matches.update_one({"id": match_id}, {"$set": update})
+    await db.matches.update_one(
+        {"id": match_id},
+        {"$set": {
+            "status": "finished",
+            "home_score": req.home_score,
+            "away_score": req.away_score,
+            "finished_at": now_iso(),
+        }},
+    )
     view = await build_match_view(m)
     await broadcast_push(
         "🏁 Maç Bitti!",
         f"{view['home']['name']} {req.home_score} - {req.away_score} {view['away']['name']}",
         f"/match/{match_id}",
     )
-    # Betting hooks: +15 per goal to owners, auto-settle coupons
-    try:
-        await betting_on_match_finished(match_id, req.home_score, req.away_score,
-                                        req.home_corners, req.away_corners)
-    except Exception as exc:
-        logger.warning("betting_on_match_finished failed: %s", exc)
     return {"status": "finished"}
 
 
@@ -735,23 +711,10 @@ async def edit_match(match_id: str, req: MatchEditReq, admin: dict = Depends(req
         update["scheduled_time"] = req.scheduled_time
     if req.status is not None:
         update["status"] = req.status
-    if req.home_corners is not None:
-        update["home_corners"] = int(req.home_corners)
-    if req.away_corners is not None:
-        update["away_corners"] = int(req.away_corners)
     if req.home_score is not None and req.away_score is not None and req.status is None:
         update["status"] = "finished"
     await db.matches.update_one({"id": match_id}, {"$set": update})
     out = await db.matches.find_one({"id": match_id})
-    # If status became finished, trigger betting hook
-    if update.get("status") == "finished":
-        try:
-            hc = update.get("home_corners", out.get("home_corners"))
-            ac = update.get("away_corners", out.get("away_corners"))
-            await betting_on_match_finished(match_id, int(out.get("home_score") or 0),
-                                            int(out.get("away_score") or 0), hc, ac)
-        except Exception as exc:
-            logger.warning("betting_on_match_finished (edit) failed: %s", exc)
     return await build_match_view(out)
 
 
@@ -985,15 +948,6 @@ async def build_cup_match_view(m):
         "live_home": m.get("live_home", 0),
         "live_away": m.get("live_away", 0),
         "cancel_reason": m.get("cancel_reason", ""),
-        "home_corners": m.get("home_corners"),
-        "away_corners": m.get("away_corners"),
-        "odds": m.get("odds") or None,
-        "bet_locks": m.get("bet_locks") or {},
-        "week": m.get("round"),
-        "mode": "cup",
-        "home_team_id": m["home_team_id"],
-        "away_team_id": m.get("away_team_id"),
-        "scheduled_time": m.get("scheduled_time", ""),
     }
 
 
@@ -1029,17 +983,6 @@ async def cup_bracket():
     if not t or t.get("mode") != "cup":
         return {"rounds": [], "champion": None, "status": None, "tournament": None}
     return await build_cup_bracket(t)
-
-
-@api.get("/cup/matches")
-async def cup_matches():
-    """Flat list of cup matches (for betting UI)."""
-    t = await active_tournament()
-    if not t or t.get("mode") != "cup":
-        return []
-    matches = await db.matches.find({"tournament_id": t["id"], "mode": "cup", "bye": {"$ne": True}}, {"_id": 0}).to_list(2000)
-    matches.sort(key=lambda m: (m.get("round", 0), m.get("slot_index", 0)))
-    return [await build_cup_match_view(m) for m in matches]
 
 
 @api.get("/cup/summary")
@@ -1136,28 +1079,22 @@ async def cup_set_result(match_id: str, req: CupResultReq, admin: dict = Depends
     else:
         winner = m["home_team_id"] if hs > as_ else m["away_team_id"]
     was_finished = m.get("status") == "finished"
-    upd = {
-        "home_score": hs,
-        "away_score": as_,
-        "pen_winner_team_id": (req.pen_winner_team_id if hs == as_ else None),
-        "winner_team_id": winner,
-        "status": "finished",
-        "finished_at": now_iso(),
-    }
-    if req.home_corners is not None:
-        upd["home_corners"] = int(req.home_corners)
-    if req.away_corners is not None:
-        upd["away_corners"] = int(req.away_corners)
-    await db.matches.update_one({"id": match_id}, {"$set": upd})
+    await db.matches.update_one(
+        {"id": match_id},
+        {"$set": {
+            "home_score": hs,
+            "away_score": as_,
+            "pen_winner_team_id": (req.pen_winner_team_id if hs == as_ else None),
+            "winner_team_id": winner,
+            "status": "finished",
+            "finished_at": now_iso(),
+        }},
+    )
     if not was_finished:
         home = await team_lite(m["home_team_id"])
         away = await team_lite(m.get("away_team_id"))
         pen = " (P)" if hs == as_ else ""
         await broadcast_push("🏁 Maç Bitti!", f"{home['name']} {hs} - {as_} {away['name'] if away else '?'}{pen}", f"/match/{match_id}")
-    try:
-        await betting_on_match_finished(match_id, hs, as_, req.home_corners, req.away_corners)
-    except Exception as exc:
-        logger.warning("cup betting_on_match_finished failed: %s", exc)
     await maybe_advance_round(m["tournament_id"], m["round"])
     return {"ok": True, "winner_team_id": winner}
 
@@ -1851,7 +1788,6 @@ async def revoke_admin(user_id: str, founder: dict = Depends(require_founder)):
 
 
 app.include_router(api)
-app.include_router(betting_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1888,11 +1824,6 @@ async def startup():
         )
     elif existing.get("role") != "founder":
         await db.users.update_one({"id": existing["id"]}, {"$set": {"role": "founder"}})
-    # Betting: ensure all users have a 'points' wallet
-    try:
-        await ensure_all_users_have_points()
-    except Exception as exc:
-        logger.warning("ensure_all_users_have_points failed: %s", exc)
 
 
 @app.on_event("shutdown")

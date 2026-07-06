@@ -1,7 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Swords } from "lucide-react";
-import H2HModal from "./H2HModal";
 
 function TeamMini({ team, align = "left" }) {
   return (
@@ -16,26 +14,16 @@ function TeamMini({ team, align = "left" }) {
   );
 }
 
-function MatchCard({ m, onScheduledClick }) {
+function MatchCard({ m }) {
   const navigate = useNavigate();
   const finished = m.status === "finished";
   const live = m.status === "live";
-  const scheduled = m.status === "scheduled";
-  const handleClick = () => {
-    if (scheduled && onScheduledClick) onScheduledClick(m);
-    else navigate(`/match/${m.id}`);
-  };
   return (
     <div
       data-testid={`fixture-match-${m.id}`}
-      onClick={handleClick}
-      className="glass rounded-xl px-3 py-2.5 w-[200px] shrink-0 hover:-translate-y-0.5 transition-transform cursor-pointer relative"
+      onClick={() => navigate(`/match/${m.id}`)}
+      className="glass rounded-xl px-3 py-2.5 w-[200px] shrink-0 hover:-translate-y-0.5 transition-transform cursor-pointer"
     >
-      {scheduled && (
-        <span className="absolute -top-1.5 -right-1.5 bg-neon-blue/20 border border-neon-blue/50 text-neon-blue text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 backdrop-blur">
-          <Swords className="w-2.5 h-2.5" /> H2H
-        </span>
-      )}
       <div className="flex items-center justify-between">
         <TeamMini team={m.home} />
         <div className="text-center px-1 min-w-[52px]">
@@ -57,7 +45,6 @@ function MatchCard({ m, onScheduledClick }) {
       {finished && m.finished_at && (
         <div className="text-[9px] text-zinc-500 text-center mt-1">
           Bitti · {new Date(m.finished_at).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
-          {m.home_corners != null && m.away_corners != null && <span className="ml-1 text-cyan-300/70">• K: {m.home_corners}-{m.away_corners}</span>}
         </div>
       )}
     </div>
@@ -65,22 +52,12 @@ function MatchCard({ m, onScheduledClick }) {
 }
 
 // Full-width row used in mobile previews and the vertical expanded view (no horizontal scroll).
-export function MatchRow({ m, onScheduledClick }) {
+export function MatchRow({ m }) {
   const navigate = useNavigate();
   const finished = m.status === "finished";
   const live = m.status === "live";
-  const scheduled = m.status === "scheduled";
-  const handleClick = () => {
-    if (scheduled && onScheduledClick) onScheduledClick(m);
-    else navigate(`/match/${m.id}`);
-  };
   return (
-    <div data-testid={`fixture-row-${m.id}`} onClick={handleClick} className="flex items-center gap-2 glass rounded-xl px-3 py-2.5 cursor-pointer hover:bg-white/5 transition-colors relative">
-      {scheduled && (
-        <span className="absolute top-1 right-1 bg-neon-blue/15 border border-neon-blue/40 text-neon-blue text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-          <Swords className="w-2.5 h-2.5" /> H2H
-        </span>
-      )}
+    <div data-testid={`fixture-row-${m.id}`} onClick={() => navigate(`/match/${m.id}`)} className="flex items-center gap-2 glass rounded-xl px-3 py-2.5 cursor-pointer hover:bg-white/5 transition-colors">
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {m.home.logo_url ? (
           <img src={m.home.logo_url} alt="" className="w-6 h-6 rounded-full object-cover border border-white/10 shrink-0" />
@@ -91,12 +68,7 @@ export function MatchRow({ m, onScheduledClick }) {
       </div>
       <div className="text-center px-1 min-w-[54px]">
         {finished ? (
-          <div>
-            <div className="font-heading font-extrabold text-sm text-white">{m.home_score}<span className="text-zinc-500"> - </span>{m.away_score}</div>
-            {m.home_corners != null && m.away_corners != null && (
-              <div className="text-[9px] text-cyan-300/70">K {m.home_corners}-{m.away_corners}</div>
-            )}
-          </div>
+          <div className="font-heading font-extrabold text-sm text-white">{m.home_score}<span className="text-zinc-500"> - </span>{m.away_score}</div>
         ) : live ? (
           <div>
             <div className="font-heading font-extrabold text-sm neon-text-green">{m.live_home ?? 0}<span className="text-zinc-500"> - </span>{m.live_away ?? 0}</div>
@@ -119,10 +91,6 @@ export function MatchRow({ m, onScheduledClick }) {
 }
 
 export function FixtureScroll({ matches, vertical = false }) {
-  const [h2h, setH2h] = useState(null);
-  const openH2H = (m) => {
-    if (m?.home_team_id && m?.away_team_id) setH2h({ a: m.home_team_id, b: m.away_team_id });
-  };
   const weeks = useMemo(() => {
     const map = {};
     (matches || []).forEach((m) => {
@@ -146,12 +114,11 @@ export function FixtureScroll({ matches, vertical = false }) {
             <div className="label-xs mb-2 neon-text-blue">{wk.week}. Hafta</div>
             <div className="space-y-2">
               {wk.matches.map((m) => (
-                <MatchRow key={m.id} m={m} onScheduledClick={openH2H} />
+                <MatchRow key={m.id} m={m} />
               ))}
             </div>
           </div>
         ))}
-        {h2h && <H2HModal teamA={h2h.a} teamB={h2h.b} onClose={() => setH2h(null)} />}
       </div>
     );
   }
@@ -164,13 +131,12 @@ export function FixtureScroll({ matches, vertical = false }) {
             <div className="label-xs mb-2 neon-text-blue">{wk.week}. Hafta</div>
             <div className="flex flex-col gap-2">
               {wk.matches.map((m) => (
-                <MatchCard key={m.id} m={m} onScheduledClick={openH2H} />
+                <MatchCard key={m.id} m={m} />
               ))}
             </div>
           </div>
         ))}
       </div>
-      {h2h && <H2HModal teamA={h2h.a} teamB={h2h.b} onClose={() => setH2h(null)} />}
     </div>
   );
 }
