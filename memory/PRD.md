@@ -64,3 +64,18 @@ Türkçe eFootball lig/kupa yönetim uygulaması. Final sürüm öncesi düzeltm
 
 ## Kalan Fazlar
 - FAZ 2/3'ün kalan UI parçaları (canlı dakika ekranı detayları, bildirim deep-link → magazin, vb.) ana istek listesinde; bu oturum sadece FAZ 4 + FAZ 1 kapsamındaydı.
+
+## Faz 5 — Küçük Eklentiler (2026-07) ✅
+- Backend keep-alive: GET /api/keepalive (DB ping + zaman); frontend her 10dk tab açıkken ping atar (useBackendKeepalive App root'ta). Render dokümanına UptimeRobot/cron-job.org talimatları eklendi.
+- **DEPLOYMENT_GCP_VM.md** eklendi: e2-micro free tier, systemd + Nginx reverse proxy + Let's Encrypt HTTPS, alternatif Docker kurulumu.
+- Puan durumu Son 5: yeşil tik (W) / kırmızı X (L) / gri eksi (D) daireleri; mobilde hidden değil artık; ana sayfa StandingsPreview'a da eklendi.
+- Magazin @mention'lar body içinde inline renkli tıklanabilir buton olarak render ediliyor (MentionText komponenti). Chip'ler altta hâlâ var.
+- Her magazin kendi sayfası: /magazine/:id (MagazineDetail). Üstte başlık + tarih, altında medya (YouTube auto-embed veya optimize edilmiş resim), scrollable body, en altta bağlantı chip'leri. Push bildirimleri de bu sayfaya deep-link olur.
+- "Section" mention'ları: mention-targets'a Fikstür/Puan Durumu/Kupa Ağacı/Gösteri Maçları/Magazin Arşivi eklendi (url=`/?section=...`). Dashboard `?section=` param'ını okuyup ilgili fullscreen modal'ı açar.
+- PUT /api/admin/tournament: kurucu turnuva başladıktan sonra ad ve kapak resmini değiştirebilir. Admin > Turnuva'ya "Düzenle" butonu + EditTournamentDialog eklendi.
+- Cloudinary otomatik ölçekleme: `optimizeImage(url,{w,h,crop,gravity})` helper'ı `f_auto,q_auto,c_fill` transformasyonu ekler. Dashboard hero ve magazin arşivi bunu kullanır. `tournamentCover(url)` = 1200×675.
+
+### 2026-07 küçük düzeltmeler
+- publish_magazine varsayılan URL'i `/?magazine=id` yerine `/magazine/id` oldu (dedicated sayfaya deep-link).
+- MatchMagazineReq artık opsiyonel mentions kabul ediyor (match magazine'lerde de link etiketleyebiliyoruz).
+- Draw indicator "•" → Minus icon; Son 5 kolonu mobilde de görünür.

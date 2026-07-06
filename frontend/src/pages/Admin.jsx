@@ -133,7 +133,7 @@ function TournamentTab({ tournament, onChange }) {
     return (
       <Section title={isCup ? "Aktif Kupa" : "Aktif Turnuva"}>
         <div className="flex items-center gap-4 mb-6">
-          {tournament.cover_url && <img src={tournament.cover_url} alt="" className="w-20 h-20 rounded-2xl object-cover" />}
+          {tournament.cover_url && <img src={tournament.cover_url} alt="" className="w-20 h-20 rounded-2xl object-contain bg-black/40 p-1" />}
           <div>
             <div className="font-heading font-bold text-2xl flex items-center gap-2">
               {tournament.name}

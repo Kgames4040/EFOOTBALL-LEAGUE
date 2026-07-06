@@ -1,29 +1,24 @@
 #!/usr/bin/env python3
 """
-Backend test for FAZ 4 features:
-1. League match cancel
-2. Cup match cancel (advance & both_out)
-3. Odd-team mini-league cup progression
-4. Pool clubs + magazine video_url
+Backend test for 2026-07 session features:
+1. GET /api/keepalive (no auth, DB ping)
+2. PUT /api/admin/tournament (founder edits name & cover)
+3. GET /api/magazine/{id} (public single item fetch)
+4. GET /api/mention-targets (extended with section mentions)
+5. POST /api/admin/matches/{id}/magazine (with mentions support)
 """
 import requests
 import json
-import time
-import random
+import uuid
 
-# Backend URL
-BASE_URL = "https://133cec62-2606-4ce0-b0ab-8e0a7ad280bf.preview.emergentagent.com/api"
+# Backend URL from frontend/.env
+BASE_URL = "https://f64ebd19-4f62-41c6-80c2-5571e510b84a.preview.emergentagent.com/api"
 
-# Founder credentials
+# Founder credentials from /app/memory/test_credentials.md
 FOUNDER_USERNAME = "neco"
 FOUNDER_PASSWORD = "neco404"
 
-# Test data
-test_users = []
-test_teams = []
 founder_token = None
-test_run_id = int(time.time() * 1000) % 1000000  # Unique ID for this test run
-team_counter = 0  # Global counter for unique team names
 
 
 def log(msg):
@@ -40,582 +35,371 @@ def login_founder():
     assert resp.status_code == 200, f"Founder login failed: {resp.status_code} {resp.text}"
     data = resp.json()
     founder_token = data["token"]
-    log(f"✓ Founder logged in, token: {founder_token[:20]}...")
+    log(f"✓ Founder logged in")
     return founder_token
 
 
-def create_test_user(username, password):
-    log(f"Creating user {username}...")
-    resp = requests.post(f"{BASE_URL}/auth/register", json={
-        "username": username,
-        "password": password
-    })
-    assert resp.status_code == 200, f"User creation failed: {resp.status_code} {resp.text}"
-    data = resp.json()
-    log(f"✓ User {username} created")
-    return data
-
-
-def login_user(username, password):
-    resp = requests.post(f"{BASE_URL}/auth/login", json={
-        "username": username,
-        "password": password
-    })
-    assert resp.status_code == 200, f"User login failed: {resp.status_code} {resp.text}"
-    return resp.json()["token"]
-
-
-def create_team(token, name, abbr):
-    log(f"Creating team {name}...")
-    resp = requests.post(f"{BASE_URL}/teams", 
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "name": name,
-            "abbreviation": abbr,
-            "logo_url": f"https://via.placeholder.com/100?text={abbr}",
-            "manager": {
-                "name": f"Manager {name}",
-                "birthdate": "1980-01-01",
-                "hometown": "Istanbul",
-                "nationality": "Turkey",
-                "flag": "🇹🇷",
-                "photo_url": ""
-            },
-            "description": f"Test team {name}"
-        })
-    assert resp.status_code == 200, f"Team creation failed: {resp.status_code} {resp.text}"
-    data = resp.json()
-    log(f"✓ Team {name} created with id {data['id']}")
-    return data
-
-
-def delete_tournament():
-    log("Deleting current tournament...")
-    resp = requests.delete(f"{BASE_URL}/admin/tournament",
-        headers={"Authorization": f"Bearer {founder_token}"})
-    if resp.status_code == 200:
-        log("✓ Tournament deleted")
-    else:
-        log(f"No tournament to delete or error: {resp.status_code}")
-
-
-def create_tournament(name, weeks, mode):
-    log(f"Creating {mode} tournament: {name}...")
-    resp = requests.post(f"{BASE_URL}/admin/tournament",
-        headers={"Authorization": f"Bearer {founder_token}"},
-        json={
-            "name": name,
-            "weeks": weeks,
-            "cover_url": "https://via.placeholder.com/800x400?text=Tournament",
-            "mode": mode
-        })
-    assert resp.status_code == 200, f"Tournament creation failed: {resp.status_code} {resp.text}"
-    data = resp.json()
-    log(f"✓ Tournament created: {data['id']}")
-    return data
-
-
-def generate_fixture():
-    log("Generating random fixture...")
-    resp = requests.post(f"{BASE_URL}/admin/fixture/random",
-        headers={"Authorization": f"Bearer {founder_token}"})
-    assert resp.status_code == 200, f"Fixture generation failed: {resp.status_code} {resp.text}"
-    log("✓ Fixture generated")
-
-
-def get_matches():
-    resp = requests.get(f"{BASE_URL}/matches")
-    assert resp.status_code == 200, f"Get matches failed: {resp.status_code}"
-    return resp.json()
-
-
-def get_standings():
-    resp = requests.get(f"{BASE_URL}/standings")
-    assert resp.status_code == 200, f"Get standings failed: {resp.status_code}"
-    return resp.json()
-
-
-def get_magazine():
-    resp = requests.get(f"{BASE_URL}/magazine")
-    assert resp.status_code == 200, f"Get magazine failed: {resp.status_code}"
-    return resp.json()
-
-
-def cancel_league_match(match_id, reason):
-    log(f"Canceling league match {match_id}...")
-    resp = requests.post(f"{BASE_URL}/admin/matches/{match_id}/cancel",
-        headers={"Authorization": f"Bearer {founder_token}"},
-        json={"reason": reason})
-    assert resp.status_code == 200, f"Cancel match failed: {resp.status_code} {resp.text}"
-    data = resp.json()
-    log(f"✓ Match canceled: {data}")
-    return data
-
-
-def draw_cup():
-    log("Drawing cup bracket...")
-    resp = requests.post(f"{BASE_URL}/admin/cup/draw",
-        headers={"Authorization": f"Bearer {founder_token}"})
-    assert resp.status_code == 200, f"Cup draw failed: {resp.status_code} {resp.text}"
-    log("✓ Cup drawn")
-
-
-def get_cup_bracket():
-    resp = requests.get(f"{BASE_URL}/cup/bracket")
-    assert resp.status_code == 200, f"Get cup bracket failed: {resp.status_code}"
-    return resp.json()
-
-
-def cancel_cup_match(match_id, reason, cup_action, advance_team_id=None):
-    log(f"Canceling cup match {match_id} with action {cup_action}...")
-    payload = {
-        "reason": reason,
-        "cup_action": cup_action
-    }
-    if advance_team_id:
-        payload["advance_team_id"] = advance_team_id
-    resp = requests.post(f"{BASE_URL}/admin/cup/match/{match_id}/cancel",
-        headers={"Authorization": f"Bearer {founder_token}"},
-        json=payload)
-    assert resp.status_code == 200, f"Cancel cup match failed: {resp.status_code} {resp.text}"
-    data = resp.json()
-    log(f"✓ Cup match canceled: {data}")
-    return data
-
-
-def start_cup_match(match_id):
-    log(f"Starting cup match {match_id}...")
-    resp = requests.post(f"{BASE_URL}/admin/cup/match/{match_id}/start",
-        headers={"Authorization": f"Bearer {founder_token}"})
-    assert resp.status_code == 200, f"Start cup match failed: {resp.status_code} {resp.text}"
-    log("✓ Cup match started")
-
-
-def finish_cup_match(match_id, home_score, away_score):
-    log(f"Finishing cup match {match_id} with score {home_score}-{away_score}...")
-    resp = requests.post(f"{BASE_URL}/admin/cup/match/{match_id}/result",
-        headers={"Authorization": f"Bearer {founder_token}"},
-        json={
-            "home_score": home_score,
-            "away_score": away_score
-        })
-    assert resp.status_code == 200, f"Finish cup match failed: {resp.status_code} {resp.text}"
-    log("✓ Cup match finished")
-
-
-def add_pool_club(name, logo_url):
-    log(f"Adding pool club {name}...")
-    resp = requests.post(f"{BASE_URL}/admin/pool-clubs",
-        headers={"Authorization": f"Bearer {founder_token}"},
-        json={
-            "name": name,
-            "logo_url": logo_url
-        })
-    return resp
-
-
-def get_pool_clubs():
-    resp = requests.get(f"{BASE_URL}/pool-clubs")
-    assert resp.status_code == 200, f"Get pool clubs failed: {resp.status_code}"
-    return resp.json()
-
-
-def delete_pool_club(club_id):
-    log(f"Deleting pool club {club_id}...")
-    resp = requests.delete(f"{BASE_URL}/admin/pool-clubs/{club_id}",
-        headers={"Authorization": f"Bearer {founder_token}"})
-    assert resp.status_code == 200, f"Delete pool club failed: {resp.status_code} {resp.text}"
-    log("✓ Pool club deleted")
-
-
-def add_magazine(title, body, video_url=""):
-    log(f"Adding magazine item: {title}...")
-    resp = requests.post(f"{BASE_URL}/admin/magazine",
-        headers={"Authorization": f"Bearer {founder_token}"},
-        json={
-            "title": title,
-            "body": body,
-            "video_url": video_url,
-            "is_leader_highlight": False
-        })
-    assert resp.status_code == 200, f"Add magazine failed: {resp.status_code} {resp.text}"
-    data = resp.json()
-    log(f"✓ Magazine item added: {data['id']}")
-    return data
-
-
-def setup_teams(count):
-    """Create test users and teams"""
-    global test_users, test_teams, test_run_id, team_counter
-    test_users = []
-    test_teams = []
+def test_keepalive():
+    """Test 1: GET /api/keepalive (no auth required)"""
+    log("\n" + "="*60)
+    log("TEST 1: GET /api/keepalive")
+    log("="*60)
     
-    team_names = [
-        ("Galatasaray FC", "GSR"),
-        ("Fenerbahçe SK", "FNB"),
-        ("Beşiktaş JK", "BJK"),
-        ("Trabzonspor", "TRB"),
-        ("Başakşehir FK", "BAŞ"),
-        ("Antalyaspor", "ANT"),
-        ("Konyaspor", "KON"),
-        ("Sivasspor", "SİV")
+    log("Testing keepalive endpoint (no auth)...")
+    resp = requests.get(f"{BASE_URL}/keepalive")
+    
+    assert resp.status_code == 200, f"Keepalive failed: {resp.status_code} {resp.text}"
+    
+    data = resp.json()
+    log(f"Response: {json.dumps(data, indent=2)}")
+    
+    # Verify response structure
+    assert "status" in data, "Response missing 'status' field"
+    assert data["status"] == "alive", f"Status should be 'alive', got {data['status']}"
+    
+    assert "db" in data, "Response missing 'db' field"
+    assert isinstance(data["db"], bool), f"'db' should be boolean, got {type(data['db'])}"
+    assert data["db"] == True, f"DB should be True (connected), got {data['db']}"
+    
+    assert "time" in data, "Response missing 'time' field"
+    assert isinstance(data["time"], str), f"'time' should be string (ISO timestamp), got {type(data['time'])}"
+    # Verify it's a valid ISO timestamp
+    from datetime import datetime
+    try:
+        datetime.fromisoformat(data["time"].replace('Z', '+00:00'))
+        log(f"✓ Valid ISO timestamp: {data['time']}")
+    except ValueError:
+        raise AssertionError(f"Invalid ISO timestamp: {data['time']}")
+    
+    log("✓ Response has correct structure: status='alive', db=true, time=ISO timestamp")
+    log("✅ TEST 1 PASSED: GET /api/keepalive")
+
+
+def test_put_tournament():
+    """Test 2: PUT /api/admin/tournament (founder edits name & cover)"""
+    log("\n" + "="*60)
+    log("TEST 2: PUT /api/admin/tournament")
+    log("="*60)
+    
+    # First, check if there's an active tournament
+    log("Checking for active tournament...")
+    resp = requests.get(f"{BASE_URL}/tournament/active")
+    
+    if resp.status_code == 404:
+        log("No active tournament found, creating one...")
+        # Create a league tournament
+        resp_create = requests.post(f"{BASE_URL}/admin/tournament",
+            headers={"Authorization": f"Bearer {founder_token}"},
+            json={
+                "name": "Test Ligi",
+                "weeks": 2,
+                "mode": "league",
+                "cover_url": ""
+            })
+        assert resp_create.status_code == 200, f"Tournament creation failed: {resp_create.status_code} {resp_create.text}"
+        log("✓ Test tournament created")
+        
+        # Get the active tournament again
+        resp = requests.get(f"{BASE_URL}/tournament/active")
+    
+    assert resp.status_code == 200, f"Get active tournament failed: {resp.status_code} {resp.text}"
+    original_tournament = resp.json()
+    log(f"Active tournament: {original_tournament['name']}")
+    
+    # Test 2a: Update tournament name and cover
+    log("\n--- Test 2a: Update name and cover ---")
+    new_name = "Yeni İsim"
+    new_cover = "https://example.com/x.jpg"
+    
+    resp = requests.put(f"{BASE_URL}/admin/tournament",
+        headers={"Authorization": f"Bearer {founder_token}"},
+        json={
+            "name": new_name,
+            "cover_url": new_cover
+        })
+    
+    assert resp.status_code == 200, f"PUT tournament failed: {resp.status_code} {resp.text}"
+    updated = resp.json()
+    
+    assert updated["name"] == new_name, f"Name not updated: expected '{new_name}', got '{updated['name']}'"
+    assert updated["cover_url"] == new_cover, f"Cover URL not updated: expected '{new_cover}', got '{updated['cover_url']}'"
+    
+    log(f"✓ Tournament updated: name='{updated['name']}', cover_url='{updated['cover_url']}'")
+    
+    # Verify via GET /api/tournament/active
+    resp_verify = requests.get(f"{BASE_URL}/tournament/active")
+    assert resp_verify.status_code == 200, "Failed to get active tournament after update"
+    verified = resp_verify.json()
+    
+    assert verified["name"] == new_name, f"GET active tournament shows old name: {verified['name']}"
+    assert verified["cover_url"] == new_cover, f"GET active tournament shows old cover: {verified['cover_url']}"
+    
+    log(f"✓ Verified via GET /api/tournament/active: name and cover updated")
+    
+    # Test 2b: Empty name should return 400
+    log("\n--- Test 2b: Empty name should return 400 ---")
+    resp_empty = requests.put(f"{BASE_URL}/admin/tournament",
+        headers={"Authorization": f"Bearer {founder_token}"},
+        json={"name": ""})
+    
+    assert resp_empty.status_code == 400, f"Empty name should return 400, got {resp_empty.status_code}"
+    log(f"✓ Empty name rejected with 400: {resp_empty.json()}")
+    
+    # Test 2c: Non-founder user should return 403
+    log("\n--- Test 2c: Non-founder user should return 403 ---")
+    # Try without token
+    resp_no_auth = requests.put(f"{BASE_URL}/admin/tournament",
+        json={"name": "Hacker"})
+    
+    assert resp_no_auth.status_code in [401, 403], f"No auth should return 401/403, got {resp_no_auth.status_code}"
+    log(f"✓ No auth rejected with {resp_no_auth.status_code}")
+    
+    # Restore original tournament name
+    log("\n--- Restoring original tournament name ---")
+    resp_restore = requests.put(f"{BASE_URL}/admin/tournament",
+        headers={"Authorization": f"Bearer {founder_token}"},
+        json={"name": original_tournament["name"]})
+    assert resp_restore.status_code == 200, "Failed to restore original tournament name"
+    log(f"✓ Restored original name: {original_tournament['name']}")
+    
+    log("✅ TEST 2 PASSED: PUT /api/admin/tournament")
+
+
+def test_get_magazine_by_id():
+    """Test 3: GET /api/magazine/{id} (public, no auth)"""
+    log("\n" + "="*60)
+    log("TEST 3: GET /api/magazine/{id}")
+    log("="*60)
+    
+    # First, create a magazine item with mentions
+    log("Creating a test magazine item...")
+    resp_create = requests.post(f"{BASE_URL}/admin/magazine",
+        headers={"Authorization": f"Bearer {founder_token}"},
+        json={
+            "title": "Test Magazine",
+            "body": "This is a test body with @Ana Sayfa mention",
+            "image_url": "",
+            "video_url": "",
+            "is_leader_highlight": False,
+            "mentions": [
+                {
+                    "type": "page",
+                    "label": "Ana Sayfa",
+                    "url": "/",
+                    "tag": "Ana Sayfa",
+                    "ref_id": ""
+                }
+            ]
+        })
+    
+    assert resp_create.status_code == 200, f"Magazine creation failed: {resp_create.status_code} {resp_create.text}"
+    created = resp_create.json()
+    magazine_id = created["id"]
+    log(f"✓ Magazine created with id: {magazine_id}")
+    
+    # Test 3a: Fetch by id (no auth)
+    log("\n--- Test 3a: Fetch by id (no auth) ---")
+    resp = requests.get(f"{BASE_URL}/magazine/{magazine_id}")
+    
+    assert resp.status_code == 200, f"GET magazine by id failed: {resp.status_code} {resp.text}"
+    data = resp.json()
+    
+    log(f"Response: {json.dumps(data, indent=2)}")
+    
+    # Verify structure
+    assert data["id"] == magazine_id, f"ID mismatch: expected {magazine_id}, got {data['id']}"
+    assert data["title"] == "Test Magazine", f"Title mismatch: {data['title']}"
+    assert "body" in data, "Missing 'body' field"
+    assert "mentions" in data, "Missing 'mentions' field"
+    assert isinstance(data["mentions"], list), "'mentions' should be a list"
+    assert len(data["mentions"]) > 0, "Mentions list should not be empty"
+    
+    mention = data["mentions"][0]
+    assert mention["type"] == "page", f"Mention type should be 'page', got {mention['type']}"
+    assert mention["label"] == "Ana Sayfa", f"Mention label mismatch: {mention['label']}"
+    
+    log(f"✓ Magazine fetched successfully with full doc including mentions")
+    
+    # Test 3b: Fetch random UUID (should return 404)
+    log("\n--- Test 3b: Fetch random UUID (should return 404) ---")
+    random_id = str(uuid.uuid4())
+    resp_404 = requests.get(f"{BASE_URL}/magazine/{random_id}")
+    
+    assert resp_404.status_code == 404, f"Random UUID should return 404, got {resp_404.status_code}"
+    error_data = resp_404.json()
+    assert "detail" in error_data, "404 response should have 'detail' field"
+    log(f"✓ Random UUID returned 404 with detail: {error_data['detail']}")
+    
+    # Clean up: delete the test magazine
+    log("\n--- Cleaning up test magazine ---")
+    resp_delete = requests.delete(f"{BASE_URL}/admin/magazine/{magazine_id}",
+        headers={"Authorization": f"Bearer {founder_token}"})
+    assert resp_delete.status_code == 200, f"Magazine deletion failed: {resp_delete.status_code}"
+    log(f"✓ Test magazine deleted")
+    
+    log("✅ TEST 3 PASSED: GET /api/magazine/{id}")
+
+
+def test_mention_targets():
+    """Test 4: GET /api/mention-targets (extended with section mentions)"""
+    log("\n" + "="*60)
+    log("TEST 4: GET /api/mention-targets")
+    log("="*60)
+    
+    log("Fetching mention targets (founder auth)...")
+    resp = requests.get(f"{BASE_URL}/mention-targets",
+        headers={"Authorization": f"Bearer {founder_token}"})
+    
+    assert resp.status_code == 200, f"GET mention-targets failed: {resp.status_code} {resp.text}"
+    targets = resp.json()
+    
+    log(f"Total targets: {len(targets)}")
+    
+    # Verify structure
+    assert isinstance(targets, list), "Response should be a list"
+    assert len(targets) > 0, "Targets list should not be empty"
+    
+    # Check for required section entries
+    required_sections = [
+        {"label": "Fikstür (Tam Ekran)", "url": "/?section=fixture", "ref_id": "fixture"},
+        {"label": "Puan Durumu (Tam Ekran)", "url": "/?section=standings", "ref_id": "standings"},
+        {"label": "Kupa Ağacı (Tam Ekran)", "url": "/?section=cup", "ref_id": "cup"},
+        {"label": "Gösteri Maçları", "url": "/?section=exhibition", "ref_id": "exhibition"},
+        {"label": "Magazin Arşivi", "url": "/?section=magazine", "ref_id": "magazine"}
     ]
     
-    for i in range(count):
-        team_counter += 1
-        username = f"user{test_run_id}_{team_counter}"
-        password = f"pass{team_counter}234"
-        
-        # Create user
-        user = create_test_user(username, password)
-        token = login_user(username, password)
-        
-        # Create team
-        name, abbr = team_names[i % len(team_names)]
-        team_name = f"{name} {i+1}" if i >= len(team_names) else name
-        team_abbr = f"{abbr}{i+1}" if i >= len(team_names) else abbr
-        
-        team = create_team(token, team_name, team_abbr)
-        
-        test_users.append({"username": username, "password": password, "token": token, "user": user})
-        test_teams.append(team)
+    log("\n--- Verifying required section entries ---")
+    section_targets = [t for t in targets if t.get("type") == "section"]
+    log(f"Found {len(section_targets)} section-type targets")
     
-    log(f"✓ Setup complete: {count} users and teams created")
+    for req in required_sections:
+        matching = [t for t in section_targets 
+                   if t.get("label") == req["label"] 
+                   and t.get("url") == req["url"]
+                   and t.get("ref_id") == req["ref_id"]]
+        
+        assert len(matching) > 0, f"Missing required section: {req['label']} with url={req['url']}, ref_id={req['ref_id']}"
+        log(f"✓ Found: {req['label']} → {req['url']} (ref_id={req['ref_id']})")
+    
+    # Verify page entries still exist
+    log("\n--- Verifying page entries ---")
+    page_targets = [t for t in targets if t.get("type") == "page"]
+    log(f"Found {len(page_targets)} page-type targets")
+    
+    ana_sayfa = [t for t in page_targets if t.get("label") == "Ana Sayfa"]
+    assert len(ana_sayfa) > 0, "Missing 'Ana Sayfa' page entry"
+    log(f"✓ Found: Ana Sayfa → {ana_sayfa[0]['url']}")
+    
+    takimlar = [t for t in page_targets if t.get("label") == "Takımlar"]
+    assert len(takimlar) > 0, "Missing 'Takımlar' page entry"
+    log(f"✓ Found: Takımlar → {takimlar[0]['url']}")
+    
+    # Verify team and user entries exist
+    log("\n--- Verifying team and user entries ---")
+    team_targets = [t for t in targets if t.get("type") == "team"]
+    user_targets = [t for t in targets if t.get("type") == "user"]
+    
+    log(f"Found {len(team_targets)} team-type targets")
+    log(f"Found {len(user_targets)} user-type targets")
+    
+    # According to review request, DB has 4 teams (Takım 1-4)
+    assert len(team_targets) >= 4, f"Expected at least 4 teams, got {len(team_targets)}"
+    assert len(user_targets) >= 4, f"Expected at least 4 users, got {len(user_targets)}"
+    
+    log(f"✓ Team and user entries present")
+    
+    log("✅ TEST 4 PASSED: GET /api/mention-targets")
 
 
-def test_league_match_cancel():
-    """Test 1: League match cancel"""
+def test_post_match_magazine():
+    """Test 5: POST /api/admin/matches/{id}/magazine (with mentions support)"""
     log("\n" + "="*60)
-    log("TEST 1: LEAGUE MATCH CANCEL")
+    log("TEST 5: POST /api/admin/matches/{id}/magazine")
     log("="*60)
     
-    # Setup: 4 teams
-    setup_teams(4)
+    # Get existing matches
+    log("Fetching existing matches...")
+    resp_matches = requests.get(f"{BASE_URL}/matches")
+    assert resp_matches.status_code == 200, f"Get matches failed: {resp_matches.status_code}"
+    matches = resp_matches.json()
     
-    # Create league tournament
-    delete_tournament()
-    create_tournament("Test League", weeks=6, mode="league")
+    # Find a played match
+    played_matches = [m for m in matches if m.get("status") == "finished"]
     
-    # Generate fixture
-    generate_fixture()
+    if len(played_matches) == 0:
+        log("⚠ No played matches found, skipping this test")
+        log("✅ TEST 5 SKIPPED: POST /api/admin/matches/{id}/magazine (no played matches)")
+        return
     
-    # Get a scheduled match
-    matches = get_matches()
-    scheduled = [m for m in matches if m["status"] == "scheduled"]
-    assert len(scheduled) > 0, "No scheduled matches found"
-    
-    match = scheduled[0]
+    match = played_matches[0]
     match_id = match["id"]
-    home_team_id = match["home_team_id"]
-    away_team_id = match["away_team_id"]
-    
-    log(f"Selected match: {match['home']['name']} vs {match['away']['name']}")
-    
-    # Get initial standings
-    standings_before = get_standings()
-    home_before = next((s for s in standings_before if s["team_id"] == home_team_id), None)
-    away_before = next((s for s in standings_before if s["team_id"] == away_team_id), None)
-    
-    log(f"Before cancel - Home OM: {home_before['OM']}, P: {home_before['P']}")
-    log(f"Before cancel - Away OM: {away_before['OM']}, P: {away_before['P']}")
-    
-    # Cancel the match
-    reason = "hava muhalefeti"
-    result = cancel_league_match(match_id, reason)
-    assert result["status"] == "canceled", "Match status should be canceled"
-    
-    # Verify match is canceled
-    matches_after = get_matches()
-    canceled_match = next((m for m in matches_after if m["id"] == match_id), None)
-    assert canceled_match is not None, "Canceled match not found"
-    assert canceled_match["status"] == "canceled", f"Match status is {canceled_match['status']}, expected canceled"
-    assert canceled_match["cancel_reason"] == reason, f"Cancel reason mismatch: {canceled_match['cancel_reason']}"
-    
-    log(f"✓ Match status: {canceled_match['status']}")
-    log(f"✓ Cancel reason: {canceled_match['cancel_reason']}")
-    
-    # Verify magazine entry
-    magazine = get_magazine()
-    cancel_items = [m for m in magazine if "MAÇ İPTALİ" in m["title"]]
-    assert len(cancel_items) > 0, "No magazine item for match cancellation"
-    latest_cancel = cancel_items[0]
-    assert reason in latest_cancel["body"], f"Reason not in magazine body: {latest_cancel['body']}"
-    
-    log(f"✓ Magazine item created: {latest_cancel['title']}")
-    log(f"✓ Magazine body: {latest_cancel['body']}")
-    
-    # Verify standings: both teams should have OM+1, M+1, P unchanged (0 points)
-    standings_after = get_standings()
-    home_after = next((s for s in standings_after if s["team_id"] == home_team_id), None)
-    away_after = next((s for s in standings_after if s["team_id"] == away_team_id), None)
-    
-    log(f"After cancel - Home OM: {home_after['OM']}, M: {home_after['M']}, P: {home_after['P']}")
-    log(f"After cancel - Away OM: {away_after['OM']}, M: {away_after['M']}, P: {away_after['P']}")
-    
-    assert home_after["OM"] == home_before["OM"] + 1, f"Home OM should increase by 1: {home_before['OM']} -> {home_after['OM']}"
-    assert away_after["OM"] == away_before["OM"] + 1, f"Away OM should increase by 1: {away_before['OM']} -> {away_after['OM']}"
-    assert home_after["M"] == home_before["M"] + 1, f"Home M should increase by 1: {home_before['M']} -> {home_after['M']}"
-    assert away_after["M"] == away_before["M"] + 1, f"Away M should increase by 1: {away_before['M']} -> {away_after['M']}"
-    assert home_after["P"] == home_before["P"], f"Home P should not change: {home_before['P']} -> {home_after['P']}"
-    assert away_after["P"] == away_before["P"], f"Away P should not change: {away_before['P']} -> {away_after['P']}"
-    
-    log("✓ Standings verified: both teams have OM+1, M+1, P unchanged (0 points)")
-    log("✅ TEST 1 PASSED: League match cancel")
-
-
-def test_cup_match_cancel():
-    """Test 2: Cup match cancel (advance & both_out)"""
-    log("\n" + "="*60)
-    log("TEST 2: CUP MATCH CANCEL")
-    log("="*60)
-    
-    # Setup: 4 teams (even number for normal bracket)
-    setup_teams(4)
-    
-    # Create cup tournament
-    delete_tournament()
-    create_tournament("Test Cup", weeks=3, mode="cup")
-    
-    # Draw cup
-    draw_cup()
-    
-    # Get bracket
-    bracket = get_cup_bracket()
-    assert len(bracket["rounds"]) > 0, "No rounds in bracket"
-    
-    round1 = bracket["rounds"][0]
-    matches = round1["matches"]
-    
-    # Find a non-bye scheduled match
-    non_bye_matches = [m for m in matches if not m["bye"] and m["status"] == "scheduled"]
-    assert len(non_bye_matches) > 0, "No non-bye scheduled matches"
-    
-    match = non_bye_matches[0]
-    match_id = match["id"]
-    home_team_id = match["home"]["id"]
-    away_team_id = match["away"]["id"]
-    
-    log(f"Selected match: {match['home']['name']} vs {match['away']['name']}")
-    
-    # Test 2a: Cancel with advance action
-    log("\n--- Test 2a: Cancel with advance action ---")
-    reason = "Takım otobüsü arızalandı"
-    result = cancel_cup_match(match_id, reason, "advance", home_team_id)
-    
-    assert result["status"] == "canceled", "Match status should be canceled"
-    assert result["winner_team_id"] == home_team_id, f"Winner should be {home_team_id}, got {result['winner_team_id']}"
-    
-    log(f"✓ Match canceled with advance action")
-    log(f"✓ Winner team: {result['winner_team_id']}")
-    
-    # Verify bracket
-    bracket_after = get_cup_bracket()
-    round1_after = bracket_after["rounds"][0]
-    canceled_match = next((m for m in round1_after["matches"] if m["id"] == match_id), None)
-    assert canceled_match["status"] == "canceled", "Match should be canceled in bracket"
-    assert canceled_match["winner_team_id"] == home_team_id, "Winner should be set in bracket"
-    
-    log(f"✓ Bracket updated: match status={canceled_match['status']}, winner={canceled_match['winner_team_id']}")
-    
-    # Verify magazine
-    magazine = get_magazine()
-    cancel_items = [m for m in magazine if "MAÇ İPTALİ" in m["title"]]
-    assert len(cancel_items) > 0, "No magazine item for cup match cancellation"
-    
-    log(f"✓ Magazine item created: {cancel_items[0]['title']}")
-    
-    # Test 2b: Cancel with both_out action (need fresh cup)
-    log("\n--- Test 2b: Cancel with both_out action ---")
-    delete_tournament()
-    create_tournament("Test Cup 2", weeks=3, mode="cup")
-    draw_cup()
-    
-    bracket2 = get_cup_bracket()
-    round1_2 = bracket2["rounds"][0]
-    non_bye_matches2 = [m for m in round1_2["matches"] if not m["bye"] and m["status"] == "scheduled"]
-    assert len(non_bye_matches2) > 0, "No non-bye scheduled matches in second cup"
-    
-    match2 = non_bye_matches2[0]
-    match2_id = match2["id"]
-    
-    log(f"Selected match: {match2['home']['name']} vs {match2['away']['name']}")
-    
-    reason2 = "Saha kullanılamaz durumda"
-    result2 = cancel_cup_match(match2_id, reason2, "both_out")
-    
-    assert result2["status"] == "canceled", "Match status should be canceled"
-    assert result2["winner_team_id"] is None, f"Winner should be None for both_out, got {result2['winner_team_id']}"
-    
-    log(f"✓ Match canceled with both_out action")
-    log(f"✓ Winner team: {result2['winner_team_id']} (None as expected)")
-    
-    # Test 2c: Try to cancel a BYE match (should fail)
-    log("\n--- Test 2c: Try to cancel BYE match (should fail) ---")
-    bye_matches = [m for m in round1_2["matches"] if m["bye"]]
-    if len(bye_matches) > 0:
-        bye_match = bye_matches[0]
-        bye_match_id = bye_match["id"]
-        
-        log(f"Attempting to cancel BYE match {bye_match_id}...")
-        resp = requests.post(f"{BASE_URL}/admin/cup/match/{bye_match_id}/cancel",
-            headers={"Authorization": f"Bearer {founder_token}"},
-            json={"reason": "test", "cup_action": "both_out"})
-        
-        assert resp.status_code == 400, f"BYE match cancel should return 400, got {resp.status_code}"
-        log(f"✓ BYE match cancel rejected with 400 as expected")
-    else:
-        log("⚠ No BYE matches to test rejection")
-    
-    log("✅ TEST 2 PASSED: Cup match cancel")
-
-
-def test_odd_team_mini_league():
-    """Test 3: Odd-team mini-league cup progression"""
-    log("\n" + "="*60)
-    log("TEST 3: ODD-TEAM MINI-LEAGUE CUP PROGRESSION")
-    log("="*60)
-    
-    # Check current team count
-    resp = requests.get(f"{BASE_URL}/teams")
-    all_teams = resp.json()
-    team_count = len(all_teams)
-    log(f"Current team count in database: {team_count}")
-    
-    # If even, create one more team to make it odd
-    if team_count % 2 == 0:
-        log("Team count is even, creating one more team to make it odd...")
-        setup_teams(1)
-        team_count += 1
-    
-    log(f"Final team count: {team_count} (odd)")
-    
-    # Create cup tournament
-    delete_tournament()
-    create_tournament("Test Cup Odd", weeks=3, mode="cup")
-    
-    # Draw cup
-    draw_cup()
-    
-    # Get bracket
-    bracket = get_cup_bracket()
-    assert len(bracket["rounds"]) > 0, "No rounds in bracket"
-    
-    round1 = bracket["rounds"][0]
-    matches = round1["matches"]
-    
-    log(f"Round 1 has {len(matches)} matches")
-    
-    # With odd teams, should have n*(n-1)/2 matches (round-robin)
-    expected_matches = team_count * (team_count - 1) // 2
-    assert len(matches) == expected_matches, f"Expected {expected_matches} matches for {team_count} teams, got {len(matches)}"
-    
-    log(f"✓ Round 1 is a round-robin group with {len(matches)} matches (correct for {team_count} teams)")
-    
-    # Calculate expected advance_count (largest power of 2 < n)
-    p = 1
-    while p * 2 < team_count:
-        p *= 2
-    expected_advance = p
-    log(f"Expected advance_count: {expected_advance} (largest power of 2 < {team_count})")
-    
-    # Finish first 3 matches to verify the system works
-    # (finishing all matches would take too long)
-    log(f"Finishing first 3 matches to verify system...")
-    
-    scores = [(3, 0), (2, 1), (1, 0)]  # Distinct scores, no draws
-    
-    for i, match in enumerate(matches[:3]):
-        match_id = match["id"]
-        home_score, away_score = scores[i]
-        
-        log(f"Finishing match {i+1}: {match['home']['name']} {home_score}-{away_score} {match['away']['name']}")
-        
-        start_cup_match(match_id)
-        finish_cup_match(match_id, home_score, away_score)
-    
-    log("✓ First 3 group matches finished successfully")
-    
-    # Note: We won't finish all matches as it would take too long with 19 teams (171 matches)
-    # But we've verified:
-    # 1. Odd team count creates round-robin group
-    # 2. Matches can be started and finished
-    # 3. The structure is correct
-    
-    log("✓ Odd-team mini-league structure verified (round-robin with correct match count)")
-    log("⚠ Note: Not finishing all matches due to large number (would require finishing all 171 matches)")
-    log("✅ TEST 3 PASSED: Odd-team mini-league cup progression (structure verified)")
-
-
-
-def test_pool_clubs_and_magazine_video():
-    """Test 4: Pool clubs + magazine video_url"""
-    log("\n" + "="*60)
-    log("TEST 4: POOL CLUBS + MAGAZINE VIDEO")
-    log("="*60)
-    
-    # Test 4a: Add pool club
-    log("\n--- Test 4a: Add pool club ---")
-    club_name = "Galatasaray"
-    club_logo = "http://example.com/galatasaray.png"
-    
-    resp = add_pool_club(club_name, club_logo)
-    assert resp.status_code == 200, f"Add pool club failed: {resp.status_code} {resp.text}"
-    club_data = resp.json()
-    club_id = club_data["id"]
-    
-    log(f"✓ Pool club added: {club_data['name']} (id: {club_id})")
-    
-    # Test 4b: List pool clubs
-    log("\n--- Test 4b: List pool clubs ---")
-    clubs = get_pool_clubs()
-    assert any(c["id"] == club_id for c in clubs), "Added club not in list"
-    
-    log(f"✓ Pool clubs list contains {len(clubs)} club(s)")
-    
-    # Test 4c: Try to add duplicate (should fail)
-    log("\n--- Test 4c: Try to add duplicate club (should fail) ---")
-    resp_dup = add_pool_club(club_name, club_logo)
-    assert resp_dup.status_code == 400, f"Duplicate club should return 400, got {resp_dup.status_code}"
-    
-    log(f"✓ Duplicate club rejected with 400 as expected")
-    
-    # Test 4d: Delete pool club
-    log("\n--- Test 4d: Delete pool club ---")
-    delete_pool_club(club_id)
-    
-    clubs_after = get_pool_clubs()
-    assert not any(c["id"] == club_id for c in clubs_after), "Deleted club still in list"
-    
-    log(f"✓ Pool club deleted successfully")
-    
-    # Test 4e: Add magazine with video_url
-    log("\n--- Test 4e: Add magazine with video_url ---")
-    video_url = "https://youtu.be/abc12345678"
-    mag_data = add_magazine(
-        title="Röportaj: Sezon Değerlendirmesi",
-        body="Takım kaptanı ile yapılan röportaj",
-        video_url=video_url
-    )
-    
-    assert mag_data["video_url"] == video_url, f"Video URL mismatch: {mag_data['video_url']}"
-    
-    log(f"✓ Magazine item with video_url added: {mag_data['id']}")
-    log(f"✓ Video URL: {mag_data['video_url']}")
-    
-    # Verify in magazine list
-    magazine = get_magazine()
-    video_items = [m for m in magazine if m.get("video_url") == video_url]
-    assert len(video_items) > 0, "Magazine item with video_url not found in list"
-    
-    log(f"✓ Magazine item with video_url verified in list")
-    
-    log("✅ TEST 4 PASSED: Pool clubs + magazine video")
+    log(f"Selected match: {match['home']['name']} vs {match['away']['name']} (id: {match_id})")
+    
+    # Create a magazine on this match with mentions
+    log("\n--- Creating magazine on match with mentions ---")
+    resp = requests.post(f"{BASE_URL}/admin/matches/{match_id}/magazine",
+        headers={"Authorization": f"Bearer {founder_token}"},
+        json={
+            "title": "Maç Özeti",
+            "body": "Harika bir maç! @Ana Sayfa'da paylaşıldı.",
+            "image_url": "",
+            "video_url": "",
+            "mentions": [
+                {
+                    "type": "page",
+                    "label": "Ana Sayfa",
+                    "url": "/",
+                    "tag": "Ana Sayfa",
+                    "ref_id": ""
+                }
+            ]
+        })
+    
+    assert resp.status_code == 200, f"POST match magazine failed: {resp.status_code} {resp.text}"
+    data = resp.json()
+    
+    log(f"Response: {json.dumps(data, indent=2)}")
+    
+    # Verify structure
+    assert "id" in data, "Response missing 'id' field"
+    assert data["title"] == "Maç Özeti", f"Title mismatch: {data['title']}"
+    assert "mentions" in data, "Response missing 'mentions' field"
+    assert isinstance(data["mentions"], list), "'mentions' should be a list"
+    assert len(data["mentions"]) > 0, "Mentions array should be populated"
+    
+    mention = data["mentions"][0]
+    assert mention["type"] == "page", f"Mention type should be 'page', got {mention['type']}"
+    
+    log(f"✓ Magazine created on match with mentions array populated")
+    
+    # Verify via GET /api/matches/{match_id}/magazine
+    log("\n--- Verifying via GET /api/matches/{match_id}/magazine ---")
+    resp_get = requests.get(f"{BASE_URL}/matches/{match_id}/magazine",
+        headers={"Authorization": f"Bearer {founder_token}"})
+    
+    assert resp_get.status_code == 200, f"GET match magazine failed: {resp_get.status_code}"
+    match_magazines = resp_get.json()
+    
+    # Find our created magazine
+    created_mag = [m for m in match_magazines if m["id"] == data["id"]]
+    assert len(created_mag) > 0, "Created magazine not found in match magazines list"
+    
+    log(f"✓ Magazine found in match magazines list")
+    
+    # Clean up: delete the test magazine
+    log("\n--- Cleaning up test magazine ---")
+    resp_delete = requests.delete(f"{BASE_URL}/admin/magazine/{data['id']}",
+        headers={"Authorization": f"Bearer {founder_token}"})
+    assert resp_delete.status_code == 200, f"Magazine deletion failed: {resp_delete.status_code}"
+    log(f"✓ Test magazine deleted")
+    
+    log("✅ TEST 5 PASSED: POST /api/admin/matches/{id}/magazine")
 
 
 def main():
     global founder_token
     
-    log("Starting FAZ 4 Backend Tests...")
+    log("Starting 2026-07 Session Backend Tests...")
     log(f"Backend URL: {BASE_URL}")
     
     try:
@@ -623,10 +407,11 @@ def main():
         login_founder()
         
         # Run tests
-        test_league_match_cancel()
-        test_cup_match_cancel()
-        test_odd_team_mini_league()
-        test_pool_clubs_and_magazine_video()
+        test_keepalive()
+        test_put_tournament()
+        test_get_magazine_by_id()
+        test_mention_targets()
+        test_post_match_magazine()
         
         log("\n" + "="*60)
         log("✅ ALL TESTS PASSED!")

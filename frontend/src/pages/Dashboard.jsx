@@ -132,8 +132,8 @@ export default function Dashboard() {
   const Hero = (
     <div className="relative rounded-3xl overflow-hidden glass mb-6" data-testid="tournament-hero">
       {tournament.cover_url && (
-        <div className="absolute inset-0">
-          <img src={tournamentCover(tournament.cover_url)} alt="" className="w-full h-full object-cover opacity-30" />
+        <div className="absolute inset-0 overflow-hidden">
+          <img src={tournamentCover(tournament.cover_url)} alt="" className="w-full h-full object-cover opacity-30 blur-3xl scale-125" />
         </div>
       )}
       <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
@@ -142,7 +142,7 @@ export default function Dashboard() {
           <img
             src={tournamentCover(tournament.cover_url)}
             alt=""
-            className="hidden sm:block w-24 h-24 rounded-2xl object-cover border border-white/10 shadow-[0_0_18px_rgba(0,245,255,0.25)] shrink-0"
+            className="hidden sm:block w-24 h-24 rounded-2xl object-contain bg-black/40 border border-white/10 shadow-[0_0_18px_rgba(0,245,255,0.25)] shrink-0 p-1"
             data-testid="tournament-hero-image"
           />
         )}

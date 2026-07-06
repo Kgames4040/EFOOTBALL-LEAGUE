@@ -125,9 +125,61 @@ Proje kökünde hazır `render.yaml` var.
 
 ## 7) Önemli Notlar
 
-- **Free plan uyku modu:** Render ücretsiz web servisi 15 dk hareketsizlikte uykuya geçer; ilk istek ~50 sn gecikebilir. Sürekli açık olması için **Starter** plana geçebilirsin.
+- **Free plan uyku modu:** Render ücretsiz web servisi 15 dk hareketsizlikte uykuya geçer; ilk istek ~50 sn gecikebilir. **Bölüm 8**'deki keep-alive kurulumunu uygula (ücretsiz, 7/24 açık tutar) veya **Starter** plana geç.
 - **MONGO_URL gizliliği:** Connection string'i asla public repoya koyma; sadece Render env'inde tut.
 - **Admin şifresi:** Yayında `ADMIN_PASSWORD`'ü güçlü bir değerle değiştir. Backend her açılışta env'deki şifreyle admin hesabını senkronlar.
 - **Veri kalıcılığı:** Tüm veriler MongoDB Atlas'ta tutulur; Render servisini silsen bile veriler Atlas'ta kalır.
+
+---
+
+## 8) Backend'i 7/24 Açık Tutmak (Keep-Alive)
+
+Render ücretsiz plan 15 dakika hareketsizlikten sonra servisi uyutur. İki katman koruma öneriyoruz:
+
+### 8.1 Uygulama içi otomatik ping (zaten yerleşik ✅)
+- Frontend her 10 dakikada bir ve tab yeniden aktif olduğunda `GET /api/keepalive` çağırır.
+- **Etki:** Sitede en az bir kullanıcı açıkken backend uykuya geçmez.
+
+### 8.2 Harici cron (Kesin 7/24 çözüm — ÜCRETSİZ)
+
+Aşağıdaki servislerden birini seç ve backend URL'ine her 5 dakikada bir istek yaptır:
+
+**Endpoint:** `https://<backend-url>/api/keepalive`
+
+#### A) UptimeRobot (Önerilen)
+1. https://uptimerobot.com — ücretsiz hesap aç (50 monitor'e kadar).
+2. **+ Add New Monitor** →
+   - Monitor Type: **HTTP(s)**
+   - Friendly Name: `Premier Ligi Backend`
+   - URL: `https://<backend-url>/api/keepalive`
+   - Monitoring Interval: **5 minutes** (ücretsiz plan minimum)
+3. **Create Monitor**. UptimeRobot dünya çapında 5dk aralıklarla ping atacak → Render asla uykuya geçmez.
+
+#### B) cron-job.org
+1. https://cron-job.org — ücretsiz hesap aç.
+2. **Create cronjob** →
+   - Title: `Backend keepalive`
+   - URL: `https://<backend-url>/api/keepalive`
+   - Schedule: **Every 5 minutes**
+3. **Create**.
+
+#### C) GitHub Actions (opsiyonel, teknik kullanıcı için)
+`.github/workflows/keepalive.yml` dosyası oluştur:
+```yaml
+name: Keepalive
+on:
+  schedule:
+    - cron: "*/10 * * * *"  # her 10 dk
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -fsS https://<backend-url>/api/keepalive
+```
+
+> **Not:** UptimeRobot en güvenilir yol. GitHub Actions cron'u bazen 15+dk gecikebiliyor.
+
+---
 
 İyi yayınlar! 🏆
