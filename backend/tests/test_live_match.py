@@ -4,7 +4,7 @@ import time
 import pytest
 import requests
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://betting-stats-hub-8.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://stats-bet-builder.preview.emergentagent.com').rstrip('/')
 API = f"{BASE_URL}/api"
 
 FOUNDER = ("neco", "neco404")

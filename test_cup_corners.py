@@ -5,7 +5,7 @@ Test cup finish with corners support
 import requests
 import json
 
-BASE_URL = "https://53c3310c-e577-4f92-934b-c1ab12cee8aa.preview.emergentagent.com/api"
+BASE_URL = "https://stats-bet-builder.preview.emergentagent.com/api"
 FOUNDER_USERNAME = "neco"
 FOUNDER_PASSWORD = "neco404"
 

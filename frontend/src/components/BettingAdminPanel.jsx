@@ -61,12 +61,6 @@ function OddsEditor({ match, onDone }) {
            <div key={betType}>
               <div className="flex justify-between items-center mb-1">
                  <div className="text-[11px] font-bold text-[color:var(--btg-primary-soft)]">{BET_TYPE_LABEL[betType]}</div>
-                 <button type="button" className={`text-[10px] px-2 py-0.5 rounded border ${match.bet_locks?.[betType] ? "bg-red-900/30 border-red-800 text-red-200" : "bg-[color:var(--btg-surface)] border-[color:var(--btg-border)]"}`} onClick={async () => {
-                   await toggleBetLock(match.id, betType, !match.bet_locks?.[betType]);
-                   onDone?.();
-                 }}>
-                   {match.bet_locks?.[betType] ? "Grup Kilitli" : "Grup Kilitle"}
-                 </button>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                  {Object.keys(ODDS_KEY[betType]).map(sel => {

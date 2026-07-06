@@ -152,7 +152,7 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 SYSTEM_PROMPT_ODDS = (
     "You are a professional football (soccer) betting odds compiler for an eFootball amateur league. "
-    "Given two teams' recent form, head-to-head data, and tournament context, produce realistic decimal odds. "
+    "Given two teams' recent form, head-to-head data, and tournament context, produce REALISTIC and UNIQUE decimal odds for this SPECIFIC match. Never use identical values across different matches. "
     "Rules:\n"
     "1) Return STRICT JSON only, no prose, no markdown fences.\n"
     "2) Fields (all required, decimal >= 1.01):\n"
@@ -178,7 +178,7 @@ async def generate_odds_via_groq(context: Dict[str, Any]) -> Dict[str, float]:
     prompt = (
         "Return JSON odds for the upcoming match.\n"
         f"HOME_TEAM: {context.get('home_name')}\n"
-        f"AWAY_TEAM: {context.get('AWAY_NAME')}\n"
+        f"AWAY_TEAM: {context.get('away_name')}\n"
         f"HOME_LAST5: {json.dumps(context.get('home_last5', []))}\n"
         f"AWAY_LAST5: {json.dumps(context.get('away_last5', []))}\n"
         f"HEAD_TO_HEAD: {json.dumps(context.get('h2h', {}))}\n"
@@ -189,10 +189,12 @@ async def generate_odds_via_groq(context: Dict[str, Any]) -> Dict[str, float]:
         f"LEAGUE_AVG_GOALS_PER_MATCH: {context.get('league_avg_goals', 2.7)}\n"
         f"LEAGUE_AVG_CORNERS_PER_MATCH: {context.get('league_avg_corners', 5.5)}\n"
         "TOURNAMENT_CONTEXT (PUSSY CUP):\n"
-        "- Top Scorer: xiyankarFC (21 goals)\n"
-        "- Quarter Finals: KÖY 0-4 KSL, NX 3-2 FLL, XFC 2-1 NFC, KSL 1-3 NX, KSL 1-5 XFC, NX 1-8 XFC\n"
-        "- Final: XFC 6-5 NX\n"
-        "- Note: XFC (xiyankarFC) is highly offensive. Adjust odds dynamically based on these historical performances if applicable.\n"
+        f"HOME: {context.get('home_name')} vs AWAY: {context.get('away_name')}\n"
+        "Champion: xiyankarFC/XFC (21 goals, highly offensive)\n"
+        "QF: KOY 0-4 KSL | NX 3-2 FLL | XFC 2-1 NFC\n"
+        "SF: KSL 1-3 NX | KSL 1-5 XFC | NX 1-8 XFC\n"
+        "Final: XFC 6-5 NX\n"
+        "IMPORTANT: Make odds that accurately reflect these specific team strengths. High-variance matches (XFC involved) need wider spreads.\n"
     )
 
     payload = {
@@ -202,7 +204,7 @@ async def generate_odds_via_groq(context: Dict[str, Any]) -> Dict[str, float]:
             {"role": "user", "content": prompt},
         ],
         "response_format": {"type": "json_object"},
-        "temperature": 0.4,
+        "temperature": 0.85,
         "max_tokens": 1500,
     }
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
@@ -559,8 +561,8 @@ async def create_coupon(req: CouponCreateReq, user: dict = Depends(get_current_u
             raise HTTPException(400, "Sadece programlanmış maçlara bahis oynanabilir")
             
         locks = m.get("bet_locks") or {}
-        # Check both category lock and specific selection lock
-        if locks.get(it.bet_type) or locks.get(it.selection) or locks.get(f"{it.bet_type}_{it.selection}"):
+        # Check only specific selection lock (not category-wide lock)
+        if locks.get(it.selection) or locks.get(f"{it.bet_type}_{it.selection}"):
             raise HTTPException(400, f"Bu seçim ({it.selection}) bahis alımına kapatılmış")
             
         odds = m.get("odds") or {}

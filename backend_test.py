@@ -8,7 +8,7 @@ import json
 import time
 
 # Backend URL from frontend/.env
-BASE_URL = "https://53c3310c-e577-4f92-934b-c1ab12cee8aa.preview.emergentagent.com/api"
+BASE_URL = "https://stats-bet-builder.preview.emergentagent.com/api"
 
 # Founder credentials from test_credentials.md
 FOUNDER_USERNAME = "neco"
