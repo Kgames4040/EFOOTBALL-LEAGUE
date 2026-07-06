@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/
 import { StandingsTable } from "../components/StandingsTable";
 import { useConfirm } from "../components/ConfirmProvider";
 import { useAuth } from "../context/AuthContext";
+import BettingAdminPanel from "../components/BettingAdminPanel";
 import api, { formatError } from "../lib/api";
 import html2canvas from "html2canvas";
 import {
@@ -55,8 +56,8 @@ export default function Admin() {
       <Tabs defaultValue="tournament">
         <TabsList className="glass rounded-full p-1 flex-wrap h-auto gap-1 mb-6">
           {(isCup
-            ? [["tournament", "Turnuva"], ["cup", "Kupa"], ["exhibition", "Gösteri Maçı"], ["players", "Oyuncu Havuzu"], ["magazine", "Magazin"], ["users", "Kullanıcılar"], ["roles", "Roller"], ["branding", "Marka"]]
-            : [["tournament", "Turnuva"], ["fixture", "Fikstür"], ["matches", "Maçlar"], ["exhibition", "Gösteri Maçı"], ["players", "Oyuncu Havuzu"], ["magazine", "Magazin"], ["users", "Kullanıcılar"], ["roles", "Roller"], ["branding", "Marka"], ["summary", "Günün Özeti"]]
+            ? [["tournament", "Turnuva"], ["cup", "Kupa"], ["exhibition", "Gösteri Maçı"], ["players", "Oyuncu Havuzu"], ["magazine", "Magazin"], ["users", "Kullanıcılar"], ["roles", "Roller"], ["branding", "Marka"], ["betting", "🎲 Bahis"]]
+            : [["tournament", "Turnuva"], ["fixture", "Fikstür"], ["matches", "Maçlar"], ["exhibition", "Gösteri Maçı"], ["players", "Oyuncu Havuzu"], ["magazine", "Magazin"], ["users", "Kullanıcılar"], ["roles", "Roller"], ["branding", "Marka"], ["summary", "Günün Özeti"], ["betting", "🎲 Bahis"]]
           ).map(([v, l]) => (
             <TabsTrigger key={v} value={v} data-testid={`admin-tab-${v}`} className="rounded-full data-[state=active]:btn-primary data-[state=active]:text-black text-sm px-4">{l}</TabsTrigger>
           ))}
@@ -78,6 +79,7 @@ export default function Admin() {
         <TabsContent value="users"><UsersTab /></TabsContent>
         <TabsContent value="roles"><RolesTab tournament={tournament} /></TabsContent>
         <TabsContent value="branding"><BrandingTab /></TabsContent>
+        <TabsContent value="betting"><BettingAdminPanel /></TabsContent>
       </Tabs>
     </Layout>
   );
@@ -98,6 +100,7 @@ function TournamentTab({ tournament, onChange }) {
   const [name, setName] = useState("");
   const [weeks, setWeeks] = useState(4);
   const [cover, setCover] = useState("");
+  const [squareLogo, setSquareLogo] = useState("");
   const [mode, setMode] = useState("league");
   const [busy, setBusy] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -106,7 +109,7 @@ function TournamentTab({ tournament, onChange }) {
     if (!name.trim()) return toast.error(mode === "cup" ? "Kupa adı gerekli" : "Turnuva adı gerekli");
     setBusy(true);
     try {
-      await api.post("/admin/tournament", { name, weeks: parseInt(weeks) || 1, cover_url: cover, mode });
+      await api.post("/admin/tournament", { name, weeks: parseInt(weeks) || 1, cover_url: cover, square_logo_url: squareLogo, mode });
       toast.success(mode === "cup" ? "Kupa başlatıldı! Şimdi çekiliş yapın." : "Turnuva başlatıldı!");
       onChange();
     } catch (e) { toast.error(formatError(e.response?.data?.detail)); } finally { setBusy(false); }
@@ -133,7 +136,7 @@ function TournamentTab({ tournament, onChange }) {
     return (
       <Section title={isCup ? "Aktif Kupa" : "Aktif Turnuva"}>
         <div className="flex items-center gap-4 mb-6">
-          {tournament.cover_url && <img src={tournament.cover_url} alt="" className="w-20 h-20 rounded-2xl object-contain bg-black/40 p-1" />}
+          {tournament.cover_url && <img src={tournament.cover_url} alt="" className="w-20 h-20 rounded-2xl object-cover" />}
           <div>
             <div className="font-heading font-bold text-2xl flex items-center gap-2">
               {tournament.name}
@@ -179,7 +182,9 @@ function TournamentTab({ tournament, onChange }) {
         {mode === "league" && (
           <div><span className="label-xs">Kaç Hafta</span><Input type="number" min={1} value={weeks} onChange={(e) => setWeeks(e.target.value)} data-testid="tournament-weeks-input" className="mt-1 bg-white/5 border-white/15" /></div>
         )}
-        <ImageUpload value={cover} onChange={setCover} label="Kapak Görseli" testid="tournament-cover" />
+        <ImageUpload value={cover} onChange={setCover} label="Geniş Arka Plan Görseli (banner)" testid="tournament-cover" />
+        <ImageUpload value={squareLogo} onChange={setSquareLogo} label="Kare Logo (soldaki küçük görsel)" testid="tournament-square" />
+        <p className="text-[10px] text-zinc-500 -mt-2">İki görsel de aspect-ratio kilidi olmadan otomatik ölçeklenir; kareye kare, banner'a geniş yükleyebilirsin.</p>
         <button onClick={start} disabled={busy} data-testid="start-tournament-btn" className="btn-primary rounded-full px-6 py-2.5 flex items-center gap-2">{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trophy className="w-4 h-4" />} {mode === "cup" ? "Kupayı Başlat" : "Turnuvayı Başlat"}</button>
       </div>
     </Section>
@@ -189,12 +194,14 @@ function TournamentTab({ tournament, onChange }) {
 function EditTournamentDialog({ open, onClose, tournament, onSaved }) {
   const [name, setName] = useState("");
   const [cover, setCover] = useState("");
+  const [squareLogo, setSquareLogo] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (open && tournament) {
       setName(tournament.name || "");
       setCover(tournament.cover_url || "");
+      setSquareLogo(tournament.square_logo_url || "");
     }
   }, [open, tournament]);
 
@@ -202,7 +209,7 @@ function EditTournamentDialog({ open, onClose, tournament, onSaved }) {
     if (!name.trim()) return toast.error("İsim boş olamaz");
     setBusy(true);
     try {
-      await api.put("/admin/tournament", { name: name.trim(), cover_url: cover || "" });
+      await api.put("/admin/tournament", { name: name.trim(), cover_url: cover || "", square_logo_url: squareLogo || "" });
       toast.success("Turnuva güncellendi");
       onSaved && onSaved();
       onClose();
@@ -231,8 +238,9 @@ function EditTournamentDialog({ open, onClose, tournament, onSaved }) {
               className="mt-1 bg-white/5 border-white/15"
             />
           </div>
-          <ImageUpload value={cover} onChange={setCover} label="Kapak Görseli" testid="edit-tournament-cover" />
-          <div className="flex justify-end gap-2 pt-2">
+          <ImageUpload value={cover} onChange={setCover} label="Geniş Arka Plan Görseli (banner)" testid="edit-tournament-cover" />
+          <ImageUpload value={squareLogo} onChange={setSquareLogo} label="Kare Logo (soldaki küçük görsel)" testid="edit-tournament-square" />
+          <p className="text-[10px] text-zinc-500 -mt-2">Her iki görsel de aspect-ratio kilitli değil; otomatik olarak ölçeklenir.</p>          <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
@@ -493,17 +501,26 @@ function MatchesTab({ tournament }) {
   };
   const finish = async (m) => {
     const s = scores[m.id] || {};
-    const hs = parseInt(s.home ?? m.home_score ?? 0); const as_ = parseInt(s.away ?? m.away_score ?? 0);
-    try { await api.post(`/admin/matches/${m.id}/finish`, { home_score: hs, away_score: as_ }); toast.success("Maç bitti, bildirim gönderildi"); load(); }
-    catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+    const hs = parseInt(s.home ?? m.home_score ?? 0);
+    const as_ = parseInt(s.away ?? m.away_score ?? 0);
+    const hc = s.home_c != null && s.home_c !== "" ? parseInt(s.home_c) : (m.home_corners ?? null);
+    const ac = s.away_c != null && s.away_c !== "" ? parseInt(s.away_c) : (m.away_corners ?? null);
+    if (hc == null || ac == null || isNaN(hc) || isNaN(ac)) { toast.error("Korner sayılarını (ev/dep) girin"); return; }
+    try {
+      await api.post(`/admin/matches/${m.id}/finish`, { home_score: hs, away_score: as_, home_corners: hc, away_corners: ac });
+      toast.success("Maç bitti, bahisler değerlendirildi, bildirim gönderildi"); load();
+    } catch (e) { toast.error(formatError(e.response?.data?.detail)); }
   };
   const edit = async (m) => {
     const s = scores[m.id] || {};
+    const body = {
+      home_score: s.home != null ? parseInt(s.home) : m.home_score,
+      away_score: s.away != null ? parseInt(s.away) : m.away_score,
+    };
+    if (s.home_c != null && s.home_c !== "") body.home_corners = parseInt(s.home_c);
+    if (s.away_c != null && s.away_c !== "") body.away_corners = parseInt(s.away_c);
     try {
-      await api.put(`/admin/matches/${m.id}`, {
-        home_score: s.home != null ? parseInt(s.home) : m.home_score,
-        away_score: s.away != null ? parseInt(s.away) : m.away_score,
-      });
+      await api.put(`/admin/matches/${m.id}`, body);
       toast.success("Skor güncellendi"); load();
     } catch (e) { toast.error(formatError(e.response?.data?.detail)); }
   };
@@ -535,6 +552,10 @@ function MatchesTab({ tournament }) {
                   <Input type="number" min={0} placeholder="0" defaultValue={m.home_score ?? ""} onChange={(e) => setScore(m.id, "home", e.target.value)} className="w-14 bg-white/5 border-white/15 h-9 text-center" data-testid={`score-home-${m.id}`} />
                   <span className="text-zinc-500">-</span>
                   <Input type="number" min={0} placeholder="0" defaultValue={m.away_score ?? ""} onChange={(e) => setScore(m.id, "away", e.target.value)} className="w-14 bg-white/5 border-white/15 h-9 text-center" data-testid={`score-away-${m.id}`} />
+                  <span className="text-[10px] text-zinc-500 ml-1">Korner</span>
+                  <Input type="number" min={0} placeholder="K" defaultValue={m.home_corners ?? ""} onChange={(e) => setScore(m.id, "home_c", e.target.value)} className="w-12 bg-cyan-500/10 border-cyan-500/30 h-9 text-center" data-testid={`corner-home-${m.id}`} title="Ev sahibi korner" />
+                  <span className="text-zinc-500">-</span>
+                  <Input type="number" min={0} placeholder="K" defaultValue={m.away_corners ?? ""} onChange={(e) => setScore(m.id, "away_c", e.target.value)} className="w-12 bg-cyan-500/10 border-cyan-500/30 h-9 text-center" data-testid={`corner-away-${m.id}`} title="Deplasman korner" />
                   {m.status !== "finished" && m.status !== "live" && (
                     <button onClick={() => start(m)} data-testid={`start-match-${m.id}`} className="btn-primary rounded-full px-3 py-1.5 text-sm flex items-center gap-1"><Flag className="w-3.5 h-3.5" /> Başlat</button>
                   )}

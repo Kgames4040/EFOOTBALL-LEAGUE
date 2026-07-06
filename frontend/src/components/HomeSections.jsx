@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { MatchRow } from "./FixtureScroll";
 import { Last5 } from "./StandingsTable";
+import H2HModal from "./H2HModal";
 
 export function useIsDesktop() {
   const [desktop, setDesktop] = useState(() => (typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : true));
@@ -83,6 +84,7 @@ export function pickPreviewMatches(matches, n = 4) {
 }
 
 export function FixturePreview({ matches }) {
+  const [h2h, setH2h] = useState(null);
   const items = pickPreviewMatches(matches || [], 4);
   if (items.length === 0) {
     return <div className="text-zinc-500 text-sm py-3">Fikstür henüz oluşturulmadı.</div>;
@@ -90,8 +92,9 @@ export function FixturePreview({ matches }) {
   return (
     <div className="space-y-2" data-testid="fixture-preview-list">
       {items.map((m) => (
-        <MatchRow key={m.id} m={m} />
+        <MatchRow key={m.id} m={m} onScheduledClick={(match) => match?.home_team_id && match?.away_team_id && setH2h({ a: match.home_team_id, b: match.away_team_id })} />
       ))}
+      {h2h && <H2HModal teamA={h2h.a} teamB={h2h.b} onClose={() => setH2h(null)} />}
     </div>
   );
 }
