@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Bet Success</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=JetBrains+Mono:wght@700&amp;family=Sora:wght@700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#00201e",
+                        "primary-fixed-dim": "#00ddd6",
+                        "on-secondary-container": "#556d00",
+                        "tertiary": "#f2f5ff",
+                        "surface-container": "#1d2023",
+                        "surface-tint": "#00ddd6",
+                        "on-tertiary-container": "#5a5f67",
+                        "on-secondary-fixed-variant": "#3c4d00",
+                        "error": "#ffb4ab",
+                        "outline-variant": "#3a4a48",
+                        "secondary-fixed": "#c3f400",
+                        "on-error": "#690005",
+                        "on-secondary-fixed": "#161e00",
+                        "tertiary-container": "#d5d9e3",
+                        "outline": "#849492",
+                        "on-background": "#e1e2e7",
+                        "tertiary-fixed-dim": "#c2c7d0",
+                        "surface-container-highest": "#323538",
+                        "surface-container-high": "#272a2e",
+                        "surface-container-low": "#191c1f",
+                        "surface-variant": "#323538",
+                        "on-primary-container": "#006a66",
+                        "inverse-on-surface": "#2e3134",
+                        "on-secondary": "#283500",
+                        "inverse-surface": "#e1e2e7",
+                        "on-tertiary": "#2c3138",
+                        "on-surface-variant": "#b9cac8",
+                        "on-tertiary-fixed-variant": "#42474f",
+                        "tertiary-fixed": "#dee2ec",
+                        "error-container": "#93000a",
+                        "background": "#111417",
+                        "surface-bright": "#37393d",
+                        "primary": "#cffffb",
+                        "on-primary": "#003735",
+                        "primary-fixed": "#29fcf3",
+                        "on-surface": "#e1e2e7",
+                        "secondary-container": "#c3f400",
+                        "surface-container-lowest": "#0b0e11",
+                        "secondary-fixed-dim": "#abd600",
+                        "secondary": "#ffffff",
+                        "surface-dim": "#111417",
+                        "on-error-container": "#ffdad6",
+                        "primary-container": "#00f2ea",
+                        "surface": "#111417",
+                        "on-tertiary-fixed": "#171c23",
+                        "on-primary-fixed-variant": "#00504d",
+                        "inverse-primary": "#006a66"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "xl": "40px",
+                        "md": "16px",
+                        "base": "4px",
+                        "sm": "8px",
+                        "lg": "24px",
+                        "container-max": "1280px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "headline-lg": ["Sora"],
+                        "display-lg": ["Sora"],
+                        "body-md": ["Inter"],
+                        "odds-num": ["JetBrains Mono"],
+                        "headline-md": ["Sora"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "700" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "odds-num": ["16px", { "lineHeight": "16px", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .animate-scale-in {
+            animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .animate-fade-up {
+            opacity: 0;
+            animation: fadeUp 0.6s ease-out forwards;
+        }
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+
+        @keyframes scaleIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes fadeUp {
+            0% { transform: translateY(20px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+
+        .checkmark-path {
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+            animation: drawCheck 0.8s ease-out 0.3s forwards;
+        }
+
+        @keyframes drawCheck {
+            to { stroke-dashoffset: 0; }
+        }
+        
+        /* Subtle glow pulsing for the success icon */
+        .glow-pulse {
+            animation: pulseGlow 2s infinite alternate;
+        }
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 20px rgba(0, 242, 234, 0.2); }
+            100% { box-shadow: 0 0 40px rgba(0, 242, 234, 0.5); }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface min-h-screen flex items-center justify-center p-md font-body-md text-body-md overflow-hidden relative">
+<!-- Abstract Background Elements for depth -->
+<div class="absolute inset-0 pointer-events-none overflow-hidden flex justify-center items-center">
+<div class="w-[500px] h-[500px] bg-primary-container opacity-[0.03] rounded-full blur-[100px]"></div>
+</div>
+<!-- Main Content Canvas -->
+<main class="w-full max-w-[400px] flex flex-col items-center z-10">
+<!-- Animated Success Icon -->
+<div class="relative w-24 h-24 mb-lg flex items-center justify-center animate-scale-in">
+<!-- Glowing background ring -->
+<div class="absolute inset-0 rounded-full bg-primary-container/10 border-2 border-primary-container/30 glow-pulse"></div>
+<!-- Custom SVG Checkmark for exact control over drawing animation -->
+<svg class="w-12 h-12 text-primary-container z-10" fill="none" viewbox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+<path class="checkmark-path" d="M14.1 27.2l7.1 7.2 16.7-16.8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"></path>
+</svg>
+</div>
+<!-- Typography -->
+<div class="text-center mb-xl animate-fade-up delay-100 flex flex-col gap-sm">
+<h1 class="font-headline-md text-headline-md text-primary-container tracking-tight">Kupon Başarıyla Oynandı!</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-[300px] mx-auto">
+                Bol şanslar dileriz. Kuponunuz sisteme kaydedildi.
+            </p>
+</div>
+<!-- Bet Summary Card (Bento/Glassmorphism style) -->
+<div class="w-full bg-surface-container rounded-xl border border-outline-variant p-md flex flex-col gap-md animate-fade-up delay-200 relative overflow-hidden shadow-2xl">
+<!-- Subtle top gradient line for premium feel -->
+<div class="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary-container/50 to-transparent"></div>
+<!-- Header: ID & Status -->
+<div class="flex justify-between items-center">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Bilet ID</span>
+<span class="font-odds-num text-odds-num text-on-surface mt-xs">#82169-BT</span>
+</div>
+<div class="px-sm py-[2px] rounded-full border border-primary-fixed-dim bg-primary-container/5 flex items-center gap-xs">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-primary-fixed-dim">Beklemede</span>
+</div>
+</div>
+<div class="h-[1px] w-full bg-outline-variant/50"></div>
+<!-- Body: Stake -->
+<div class="flex justify-between items-center">
+<span class="font-body-md text-body-md text-on-surface-variant">Yatırılan Tutar</span>
+<span class="font-odds-num text-odds-num text-on-surface">100.00 TL</span>
+</div>
+<!-- Body: Potential Win (Highlighted) -->
+<div class="flex justify-between items-center bg-surface-container-high -mx-md -mb-md p-md rounded-b-xl border-t border-outline-variant/30 mt-xs">
+<span class="font-body-md text-body-md text-on-surface font-semibold">Olası Kazanç</span>
+<span class="font-odds-num text-[20px] leading-[24px] font-bold text-secondary-container drop-shadow-[0_0_8px_rgba(195,244,0,0.3)]">
+                    1,450.00 TL
+                </span>
+</div>
+</div>
+<!-- Actions -->
+<div class="w-full flex flex-col gap-md mt-xl animate-fade-up delay-300">
+<button class="w-full bg-primary-container text-on-primary-container py-[14px] rounded-lg font-label-sm text-label-sm uppercase tracking-wider font-bold hover:bg-primary-fixed transition-colors active:scale-[0.98] flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+                Yeni Bahis Yap
+            </button>
+<button class="w-full bg-transparent border border-outline text-on-surface py-[14px] rounded-lg font-label-sm text-label-sm uppercase tracking-wider font-bold hover:bg-surface-container-high transition-colors active:scale-[0.98] flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+                Kuponlarım
+            </button>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,39 @@
+{
+  "summary": "Verified the four final-release bug fixes for the eFootball Turkish league/cup manager. Backend: 7/7 pytest cases pass for PUT /api/auth/me (username update returns new token, password update, <3-char rejection, duplicate rejection) and DELETE /api/admin/tournament while in cup mode (deletes tournament + cleans matches). A full cup flow test using POST start->result with a drawn-score + pen_winner_team_id correctly advances winners and sets champion + finished status. Frontend: Confirmed the main 'delete cup on phones' bug is fixed - the new ConfirmDialog (data-testid=confirm-dialog) appears instead of native window.confirm, and clicking confirm-accept-btn actually deletes the cup tournament and UI returns to 'Yeni Başlat'. ProfileDialog opens from profile-menu-btn for admin and shows only the Account section; profile-save-account-btn saves and shows a sonner toast (with close button). No JS console errors observed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/cup/match/{id}/result", "issue": "Pre-existing regression test file /app/backend/tests/test_cup_and_league.py is stale: result endpoint now requires a prior call to /api/admin/cup/match/{id}/start (returns 400 'Önce maçı başlatın'). 9 tests in that legacy file fail. The new test_profile_and_delete_cup.py covers the correct flow."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_profile_and_delete_cup.py",
+    "/app/test_reports/pytest/profile_delete_cup.xml"
+  ],
+  "action_items": [
+    "(Optional) Update legacy /app/backend/tests/test_cup_and_league.py to call POST /api/admin/cup/match/{id}/start before /result, OR delete it in favor of the new test_profile_and_delete_cup.py which already covers cup creation, draw, start->result, draw+penalty winner, advance, champion, delete-with-matches-cleanup. 9 stale regression tests currently fail because of the missing start call.",
+    "(Optional) Add an automated mobile-width (390px) layout assertion for CupBracket overflow once a cup with drawn teams is seeded by tests - not verified this round.",
+    "(Optional) Add automated regression for sonner Toaster closeButton + 3.5s duration on the squad-save flow - not verified this round (requires a regular user with a team)."
+  ],
+  "critical_code_review_comments": [
+    "Backend server.py is 1179 lines (>700) - consider splitting by domain (auth, teams, tournament, cup, matches, notifications) into routers.",
+    "PUT /api/auth/me does not require current password to change password - this is per the product spec ('Password change requires NO current-password verification'), but is a security trade-off worth documenting in the README.",
+    "DELETE /api/admin/tournament only deletes the active tournament. If multiple non-active tournaments exist they could orphan. Currently mitigated because active_tournament() returns the running one; still, consider hard-deleting by id for explicitness.",
+    "ProfileUpdateReq username==empty-string is silently ignored (no error). Acceptable but UI should disable Save when no changes (currently shows 'Değişiklik yok' toast which is fine)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_profile_and_delete_cup.py (new)"
+  ],
+  "success_rate": {"backend": "100% (7/7 new tests for the fixes)", "frontend": "100% on the verified flows (delete-cup + profile dialog open/save)"},
+  "test_credentials": "Admin neco/neco404 from /app/memory/test_credentials.md - works.",
+  "seed_data_creation": "test_profile_and_delete_cup.py creates ephemeral users (TEST_prof_*, TEST_pw_*, TEST_dup1_*, TEST_du_*, TEST_fc_*) and teams (TEST_DTeam_*, TEST_FCT_*); clean_env fixture wipes them before/after each test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All four reported final-release fixes verified at the backend layer (pytest) and the main delete-cup UI bug verified end-to-end via Playwright. ProfileDialog open + admin account-save flow verified. NOT verified in UI this round: (a) ProfileDialog 'Hesap'+'Takım & TD' two-tab view for a regular user with a team (need to register a user and create a team via UI first), (b) CupBracket no-horizontal-overflow at 390px on dashboard (cup was deleted, would need to recreate cup + register 2+ users with teams + admin draw), (c) sonner Toaster closeButton + 3.5s on save-squad flow. If retesting, use REACT_APP_BACKEND_URL from /app/frontend/.env. data-testids found in DOM: profile-menu-btn, profile-dialog, profile-account-section, profile-username-input, profile-password-input, profile-toggle-pass, profile-save-account-btn, confirm-dialog, confirm-accept-btn, confirm-cancel-btn, delete-tournament-btn, mode-cup-btn, start-tournament-btn, tournament-name-input.",
+  "rca of the issue": "Original bug: tapping 'Tamamen Sil' on a mobile PWA did nothing because the click handler called native window.confirm() which is unreliable / suppressed in some mobile PWAs (especially when display-mode is standalone). Fix replaced window.confirm() with a Promise-based ConfirmProvider (src/components/ConfirmProvider.jsx) rendering a real modal dialog with explicit accept/cancel buttons. Verified end-to-end: clicking delete-tournament-btn opens [data-testid=confirm-dialog], then clicking [data-testid=confirm-accept-btn] calls DELETE /api/admin/tournament which returns {deleted:true} and the UI returns to the 'Yeni Başlat' (no active tournament) state. The fix also works for cup-mode tournaments and cleans related matches (verified server-side via test_delete_cup_with_matches_clears_matches)."
+}

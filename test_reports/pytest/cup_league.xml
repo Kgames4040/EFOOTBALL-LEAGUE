@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="9" skipped="0" tests="16" time="23.099" timestamp="2026-06-23T21:11:37.482535+00:00" hostname="agent-env-6e18a16c-2e66-4e0c-a630-e3b0535a8b27"><testcase classname="tests.test_cup_and_league" name="test_create_cup_tournament" time="0.409" /><testcase classname="tests.test_cup_and_league" name="test_cup_draw_requires_min_2_teams" time="0.539" /><testcase classname="tests.test_cup_and_league" name="test_cup_draw_even_teams_no_bye" time="1.611" /><testcase classname="tests.test_cup_and_league" name="test_cup_draw_odd_teams_creates_exactly_one_bye" time="1.969" /><testcase classname="tests.test_cup_and_league" name="test_cup_draw_two_teams_is_immediate_final" time="0.899" /><testcase classname="tests.test_cup_and_league" name="test_cup_result_higher_score_wins" time="0.945"><failure message="assert 400 == 200&#10; +  where 400 = &lt;Response [400]&gt;.status_code">backend/tests/test_cup_and_league.py:205: in test_cup_result_higher_score_wins
+    assert r.status_code == 200
+E   assert 400 == 200
+E    +  where 400 = &lt;Response [400]&gt;.status_code</failure></testcase><testcase classname="tests.test_cup_and_league" name="test_cup_draw_requires_penalty_winner" time="0.943"><failure message="assert 'penalt' in '{&quot;detail&quot;:&quot;önce maçı başlatın&quot;}'&#10; +  where '{&quot;detail&quot;:&quot;önce maçı başlatın&quot;}' = &lt;built-in method lower of str object at 0xfd860aeb3a50&gt;()&#10; +    where &lt;built-in method lower of str object at 0xfd860aeb3a50&gt; = '{&quot;detail&quot;:&quot;Önce maçı başlatın&quot;}'.lower&#10; +      where '{&quot;detail&quot;:&quot;Önce maçı başlatın&quot;}' = &lt;Response [400]&gt;.text">backend/tests/test_cup_and_league.py:229: in test_cup_draw_requires_penalty_winner
+    assert "penalt" in r.text.lower()
+E   assert 'penalt' in '{"detail":"önce maçı başlatın"}'
+E    +  where '{"detail":"önce maçı başlatın"}' = &lt;built-in method lower of str object at 0xfd860aeb3a50&gt;()
+E    +    where &lt;built-in method lower of str object at 0xfd860aeb3a50&gt; = '{"detail":"Önce maçı başlatın"}'.lower
+E    +      where '{"detail":"Önce maçı başlatın"}' = &lt;Response [400]&gt;.text</failure></testcase><testcase classname="tests.test_cup_and_league" name="test_full_cup_simulation_5_teams_to_champion" time="1.977"><failure message="AssertionError: {&quot;detail&quot;:&quot;Önce maçı başlatın&quot;}&#10;assert 400 == 200&#10; +  where 400 = &lt;Response [400]&gt;.status_code">backend/tests/test_cup_and_league.py:272: in test_full_cup_simulation_5_teams_to_champion
+    _resolve_round(admin_token, 0)
+backend/tests/test_cup_and_league.py:257: in _resolve_round
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Önce maçı başlatın"}
+E   assert 400 == 200
+E    +  where 400 = &lt;Response [400]&gt;.status_code</failure></testcase><testcase classname="tests.test_cup_and_league" name="test_full_cup_8_teams" time="3.029"><failure message="AssertionError: {&quot;detail&quot;:&quot;Önce maçı başlatın&quot;}&#10;assert 400 == 200&#10; +  where 400 = &lt;Response [400]&gt;.status_code">backend/tests/test_cup_and_league.py:311: in test_full_cup_8_teams
+    _resolve_round(admin_token, 0)
+backend/tests/test_cup_and_league.py:257: in _resolve_round
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Önce maçı başlatın"}
+E   assert 400 == 200
+E    +  where 400 = &lt;Response [400]&gt;.status_code</failure></testcase><testcase classname="tests.test_cup_and_league" name="test_full_cup_3_teams" time="1.259"><failure message="AssertionError: {&quot;detail&quot;:&quot;Önce maçı başlatın&quot;}&#10;assert 400 == 200&#10; +  where 400 = &lt;Response [400]&gt;.status_code">backend/tests/test_cup_and_league.py:334: in test_full_cup_3_teams
+    _resolve_round(admin_token, 0)
+backend/tests/test_cup_and_league.py:257: in _resolve_round
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Önce maçı başlatın"}
+E   assert 400 == 200
+E    +  where 400 = &lt;Response [400]&gt;.status_code</failure></testcase><testcase classname="tests.test_cup_and_league" name="test_magazine_auto_published" time="1.613"><failure message="AssertionError: {&quot;detail&quot;:&quot;Önce maçı başlatın&quot;}&#10;assert 400 == 200&#10; +  where 400 = &lt;Response [400]&gt;.status_code">backend/tests/test_cup_and_league.py:350: in test_magazine_auto_published
+    _resolve_round(admin_token, 0)
+backend/tests/test_cup_and_league.py:257: in _resolve_round
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Önce maçı başlatın"}
+E   assert 400 == 200
+E    +  where 400 = &lt;Response [400]&gt;.status_code</failure></testcase><testcase classname="tests.test_cup_and_league" name="test_cup_summary_top_scorer" time="1.656"><failure message="assert 400 == 200&#10; +  where 400 = &lt;Response [400]&gt;.status_code">backend/tests/test_cup_and_league.py:378: in test_cup_summary_top_scorer
+    assert r.status_code == 200
+E   assert 400 == 200
+E    +  where 400 = &lt;Response [400]&gt;.status_code</failure></testcase><testcase classname="tests.test_cup_and_league" name="test_editing_guard_after_next_round_created" time="1.611"><failure message="AssertionError: {&quot;detail&quot;:&quot;Önce maçı başlatın&quot;}&#10;assert 400 == 200&#10; +  where 400 = &lt;Response [400]&gt;.status_code">backend/tests/test_cup_and_league.py:396: in test_editing_guard_after_next_round_created
+    _resolve_round(admin_token, 0)  # round 2 now exists
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/test_cup_and_league.py:257: in _resolve_round
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Önce maçı başlatın"}
+E   assert 400 == 200
+E    +  where 400 = &lt;Response [400]&gt;.status_code</failure></testcase><testcase classname="tests.test_cup_and_league" name="test_bye_match_cannot_be_edited" time="1.292" /><testcase classname="tests.test_cup_and_league" name="test_cup_reset_and_redraw" time="1.613"><failure message="AssertionError: {&quot;detail&quot;:&quot;Önce maçı başlatın&quot;}&#10;assert 400 == 200&#10; +  where 400 = &lt;Response [400]&gt;.status_code">backend/tests/test_cup_and_league.py:428: in test_cup_reset_and_redraw
+    _resolve_round(admin_token, 0)
+backend/tests/test_cup_and_league.py:257: in _resolve_round
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Önce maçı başlatın"}
+E   assert 400 == 200
+E    +  where 400 = &lt;Response [400]&gt;.status_code</failure></testcase><testcase classname="tests.test_cup_and_league" name="test_league_regression" time="1.525" /></testsuite></testsuites>

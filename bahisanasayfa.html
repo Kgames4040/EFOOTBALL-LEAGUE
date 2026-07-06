@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>HAAL eFootball Lig - Betting</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Sora:wght@700;800&amp;family=JetBrains+Mono:wght@700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary-container": "#c3f400",
+                      "surface": "#111417",
+                      "inverse-surface": "#e1e2e7",
+                      "on-surface": "#e1e2e7",
+                      "inverse-primary": "#006a66",
+                      "surface-container-high": "#272a2e",
+                      "on-error": "#690005",
+                      "on-error-container": "#ffdad6",
+                      "on-tertiary-fixed": "#171c23",
+                      "on-primary-container": "#006a66",
+                      "secondary-fixed-dim": "#abd600",
+                      "tertiary-fixed-dim": "#c2c7d0",
+                      "secondary-fixed": "#c3f400",
+                      "on-tertiary-container": "#5a5f67",
+                      "error": "#ffb4ab",
+                      "surface-bright": "#37393d",
+                      "on-secondary-fixed": "#161e00",
+                      "on-tertiary-fixed-variant": "#42474f",
+                      "secondary": "#ffffff",
+                      "on-primary-fixed-variant": "#00504d",
+                      "on-tertiary": "#2c3138",
+                      "background": "#111417",
+                      "inverse-on-surface": "#2e3134",
+                      "on-surface-variant": "#b9cac8",
+                      "tertiary-fixed": "#dee2ec",
+                      "surface-container-lowest": "#0b0e11",
+                      "error-container": "#93000a",
+                      "on-primary-fixed": "#00201e",
+                      "tertiary": "#f2f5ff",
+                      "primary-fixed-dim": "#00ddd6",
+                      "on-background": "#e1e2e7",
+                      "surface-container": "#1d2023",
+                      "tertiary-container": "#d5d9e3",
+                      "on-secondary-fixed-variant": "#3c4d00",
+                      "on-secondary-container": "#556d00",
+                      "on-secondary": "#283500",
+                      "primary-container": "#00f2ea",
+                      "primary-fixed": "#29fcf3",
+                      "outline": "#849492",
+                      "surface-container-low": "#191c1f",
+                      "surface-tint": "#00ddd6",
+                      "surface-dim": "#111417",
+                      "on-primary": "#003735",
+                      "surface-container-highest": "#323538",
+                      "surface-variant": "#323538",
+                      "primary": "#cffffb",
+                      "outline-variant": "#3a4a48"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "xs": "4px",
+                      "gutter": "16px",
+                      "base": "4px",
+                      "container-max": "1280px",
+                      "lg": "24px",
+                      "md": "16px",
+                      "sm": "8px",
+                      "xl": "40px"
+              },
+              "fontFamily": {
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "display-lg": [
+                              "Sora"
+                      ],
+                      "odds-num": [
+                              "JetBrains Mono"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Sora"
+                      ],
+                      "label-sm": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Sora"
+                      ]
+              },
+              "fontSize": {
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "800"
+                              }
+                      ],
+                      "odds-num": [
+                              "16px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        /* Hide scrollbar for horizontal scroll areas but keep functionality */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        
+        /* Custom gradient text utility */
+        .text-gradient-primary {
+            background: linear-gradient(to right, #29fcf3, #cffffb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md antialiased min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-surface border-b border-outline-variant fixed top-0 w-full z-50 flex justify-between items-center px-md h-16">
+<div class="flex items-center gap-sm cursor-pointer hover:bg-surface-container-high transition-colors p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary-fixed-dim" style="font-variation-settings: 'FILL' 1;">sports_esports</span>
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface">eFootball Pro League</h1>
+</div>
+<div class="flex items-center gap-md">
+<button class="p-2 rounded-full hover:bg-surface-container-high transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant">search</span>
+</button>
+<div class="bg-surface-container-high px-3 py-1.5 rounded-lg flex items-center gap-2 border border-outline-variant">
+<span class="material-symbols-outlined text-primary-fixed-dim text-sm" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
+<span class="font-label-sm text-label-sm font-bold text-primary-fixed-dim">$2,450.00</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 mt-16 mb-24 px-md py-sm max-w-container-max mx-auto w-full">
+<!-- League Selector (Horizontal Scroll) -->
+<div class="mb-lg">
+<div class="flex overflow-x-auto no-scrollbar gap-sm pb-2">
+<button class="flex-shrink-0 bg-primary-fixed-dim text-on-primary font-label-sm text-label-sm px-4 py-2 rounded-full border border-primary-fixed-dim font-bold flex items-center gap-2 shadow-[0_0_10px_rgba(0,221,214,0.3)]">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">public</span>
+                    All Leagues
+                </button>
+<button class="flex-shrink-0 bg-surface-container text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm px-4 py-2 rounded-full border border-outline-variant hover:border-outline transition-colors flex items-center gap-2">
+<img class="w-4 h-4 rounded-full" data-alt="A small, stylized circular icon representing the English Premier League, featuring a minimalist lion crest in neon cyan against a dark background, suitable for a dark mode UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDnzXu86iDEje5JhOSaQgqWOFV6WWBUroo9zE1s99NSZ9U-yKKwOeAnoIoGCOLHndh0HXQskc3YPWPh2w1-Jcila1dkEcL5EoZD_nzi0-IDdJ2O0B87zbBPQ3EpWTM1Oz3-n4KaEkGFsVgc7C9Qaz_VUcxJLi5-NB2CHYqdCOcVj3C5kUAny58j0E_t7OQ3vTVinczL5IPEgdlV-eOsTgEWyJ7IUgSQDyO8twKuMGCJmznBMYAjwD_tEJeo2Hh0BgJmE0ZFbaLTL94"/>
+                    Premier League
+                </button>
+<button class="flex-shrink-0 bg-surface-container text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm px-4 py-2 rounded-full border border-outline-variant hover:border-outline transition-colors flex items-center gap-2">
+<img class="w-4 h-4 rounded-full" data-alt="A small, stylized circular icon representing La Liga, featuring a minimalist geometric shield in vibrant green against a dark background, suitable for a dark mode UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuJCaJ67TAnSe7biguAak9fgtBw-MuFgw-nPXFEK8aZ-51_lUBtUELNWqdTWOnxWolD5qdUHDwBDyGwwgDmshWEUnhYw9d58J6NMpUDLMSeNq1EP4-6JImz1WlOp16il7GBmnZ-mnIHXy-6j3J3b34zBdamN9vPF1zxibmPZs6f0E8_buef75lmkWnkeVO7jB2mUEjVt__AHJdYBKvxnadqHBcWiHOWnREI5xIIdGmPdk0rbTXu-xnhHbgIlCCL9JKtdMuM3w7sLo"/>
+                    La Liga
+                </button>
+<button class="flex-shrink-0 bg-surface-container text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm px-4 py-2 rounded-full border border-outline-variant hover:border-outline transition-colors flex items-center gap-2">
+<img class="w-4 h-4 rounded-full" data-alt="A small, stylized circular icon representing Serie A, featuring a minimalist 'A' lettermark in deep blue and white against a dark background, suitable for a dark mode UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDv_oi27yGDRHgPpnMktConSPhw2qM27jt8g1iUnQfYWM4pQNzO8h8VLjdGJOwJTp07g1UhwtVVDg4h95dzjaMahu9g-lLOZ9zeFx8hVQnndNFRcQNSisrvv4b7XQnmIvwXF-kfwy-CaCvvWqEEmGMiFWy92-SzHgrXpeA5Ni0Gl89InUR3GDR1p6mAYcI8atFcHgpogRDzatWoC8BAQo7S05xTphjhekTwaiRvrXBHBDfFYeWLdJQH0i_5j9Q8-9uBjrS-sVMP-S8"/>
+                    Serie A
+                </button>
+<button class="flex-shrink-0 bg-surface-container text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm px-4 py-2 rounded-full border border-outline-variant hover:border-outline transition-colors flex items-center gap-2">
+<img class="w-4 h-4 rounded-full" data-alt="A small, stylized circular icon representing Bundesliga, featuring a minimalist player silhouette in red and white against a dark background, suitable for a dark mode UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUmGyWrK6nNMYhQTZO2C9MOfjhuvnebfO0pMRdU_nvWsvSIcMrKH7UCgi29DMwdRW6h-pupNvSr4H8JucptNLwm4K3GVXIBwXcQby1_h_GcEVmQV9P155mu_fyG_sJF7GOZY6IphhMXVYNP3YelWyWYlGMmK8KBj2ZChtm4kujbSSSZ-hLls2CsAb8sZuV8OQCZmGT0YAc_oSHugImPST1shez8xZf-fCaDdFilOtqarOIIDYShbtxmt50uDsJ9VYN5FvcoWt-pG0"/>
+                    Bundesliga
+                </button>
+</div>
+</div>
+<!-- Section Title -->
+<div class="flex items-center justify-between mb-sm">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="w-2 h-6 bg-primary-fixed-dim rounded-full inline-block"></span>
+                Live Matches
+            </h2>
+<button class="text-primary font-label-sm text-label-sm hover:underline">View All</button>
+</div>
+<!-- Match List Stack -->
+<div class="flex flex-col gap-sm">
+<!-- Standard Match Card (Collapsed) -->
+<article class="bg-surface/80 backdrop-blur-md border border-outline-variant rounded-xl p-md flex flex-col gap-sm hover:border-outline transition-colors shadow-lg">
+<!-- Card Header -->
+<div class="flex justify-between items-center text-on-surface-variant font-label-sm text-label-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary-container text-[16px] animate-pulse" style="font-variation-settings: 'FILL' 1;">fiber_manual_record</span>
+<span class="text-secondary-container font-bold">45'</span>
+<span class="text-outline">|</span>
+<span>HAAL eFootball Lig</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">monitoring</span>
+<span>Stats</span>
+</div>
+</div>
+<!-- Teams -->
+<div class="flex justify-between items-center py-2">
+<div class="flex flex-col gap-3 w-full">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<img class="w-6 h-6 rounded-full border border-outline-variant" data-alt="A minimalist team crest for 'Dijon' featuring an abstract geometric shape in cyan on a dark gray circular background, designed for a modern eSports betting interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAEZhSI-Y7hlYxdda6LnFr2ZBf1SpnGsAGArEUwFMCk6qKJqj3qGEC2cMndzFHWgbdpc3urzLyQDHZ2K4kaF97Oez0JctMbBjN2pJBEeDDvvNq8IdmU2KEYvePd9kax-FRJRRwpuqtl66WFtHZ1zLltPHkK8v74h1XJySGVTYngmcFRTuzQYWYKsOxTslbbaRCKpCkJBn0VViP73oL119NJY4kPNKkBGFnNbqG6g4EYA_Mz6x3eKbjW2ovYOvD7cNYHYdUY-UaoJdw"/>
+<span class="font-body-lg text-body-lg text-on-surface font-semibold">Dijon eSports</span>
+</div>
+<span class="font-odds-num text-odds-num text-on-surface">1</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<img class="w-6 h-6 rounded-full border border-outline-variant" data-alt="A minimalist team crest for 'PSG' featuring a stylized Eiffel tower silhouette in red and blue on a dark gray circular background, designed for a modern eSports betting interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFJw7HYd0WAwz2837xecQECGwgjBs6jr2I2Lron7PuFJOtZqYptO2gYlOvHIhEXbX3ch05GnKTce1c4ecgm5CCe3TKr-rV35XtM1dKtIWlqjKIAAKuFDUkxMmbZB6pe7zYHHvpvTa2DYG6nfHCwL5GvJST8GbGaDaBPVc2We2O-ShYY9uXYjz0mgXRmQcGjbhcQzeZ35UC15eEfyKb6Es_7jT9Huz_8gBdIkVGVgs-8fDuGEohj7L4C3RnSmr3NWw1b4Sh90d0g5g"/>
+<span class="font-body-lg text-body-lg text-on-surface font-semibold">PSG eSports</span>
+</div>
+<span class="font-odds-num text-odds-num text-on-surface">2</span>
+</div>
+</div>
+</div>
+<!-- 1 X 2 Odds Row -->
+<div class="grid grid-cols-3 gap-xs mt-2">
+<button class="bg-surface-container-high border border-outline-variant rounded-lg p-2 flex flex-col items-center justify-center hover:bg-surface-container-highest transition-colors group relative overflow-hidden">
+<span class="font-label-sm text-label-sm text-on-surface-variant mb-1">1</span>
+<span class="font-odds-num text-odds-num text-primary-fixed-dim group-hover:text-primary transition-colors">3.40</span>
+<div class="absolute inset-0 bg-gradient-to-t from-primary-fixed-dim/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</button>
+<button class="bg-surface-container-high border border-outline-variant rounded-lg p-2 flex flex-col items-center justify-center hover:bg-surface-container-highest transition-colors group relative overflow-hidden">
+<span class="font-label-sm text-label-sm text-on-surface-variant mb-1">X</span>
+<span class="font-odds-num text-odds-num text-on-surface group-hover:text-white transition-colors">3.20</span>
+<div class="absolute inset-0 bg-gradient-to-t from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</button>
+<!-- Selected Odd State -->
+<button class="bg-surface-container-high border border-primary rounded-lg p-2 flex flex-col items-center justify-center relative overflow-hidden shadow-[inset_0_0_10px_rgba(41,252,243,0.1)]">
+<div class="absolute inset-0 bg-gradient-to-br from-primary-fixed-dim/20 to-transparent"></div>
+<span class="font-label-sm text-label-sm text-primary mb-1 relative z-10">2</span>
+<div class="flex items-center gap-1 relative z-10">
+<span class="font-odds-num text-odds-num text-primary font-bold">2.10</span>
+<span class="material-symbols-outlined text-[12px] text-secondary-container">arrow_upward</span>
+</div>
+</button>
+</div>
+<!-- Expand Chevron -->
+<button class="flex items-center justify-center w-full pt-2 text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined">expand_more</span>
+</button>
+</article>
+<!-- Expanded Match Card -->
+<article class="bg-surface border border-primary-fixed-dim/30 rounded-xl p-md flex flex-col gap-sm shadow-[0_0_15px_rgba(0,221,214,0.05)] relative overflow-hidden">
+<!-- Subtle background glow -->
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary-fixed-dim/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+<!-- Card Header -->
+<div class="flex justify-between items-center text-on-surface-variant font-label-sm text-label-sm relative z-10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span>Today 23:00</span>
+<span class="text-outline">|</span>
+<span>Serie A</span>
+</div>
+<span class="text-outline-variant font-odds-num text-[10px]">ID: 82169</span>
+</div>
+<!-- Teams -->
+<div class="flex justify-between items-center py-2 relative z-10">
+<div class="flex items-center gap-3 w-5/12">
+<img class="w-8 h-8 rounded-full border border-outline-variant" data-alt="A minimalist team crest for 'Real Oviedo' featuring a dark blue cross on a white shield, set against a dark gray circular background, designed for a modern eSports betting interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBe285ofZwjNdBwFn2oNvmnCcUNHWt3Z0VPyovCPtc5y9Q3v_IeUocowAsYMw4RC_Tga88m4zWRPY-OlWLISP6GoROA8BkyLAT8yS1JMyWpiYGHtIL1RzNAia7w9AVKuwtToT8URY5DO55TPIc2gIXRG4yQ2dZ03aAqXcLPsDoG6zRfuIDRtay376j2QUHrGUW0wHZQxPP4-sOiNiHRtaOx3i3ddoVpYmVqJ2Bcj6lnswY0z-KEUBkGJryUo5u9D9TH9f38javtm8Y"/>
+<span class="font-body-lg text-body-lg text-on-surface font-semibold truncate">Real Oviedo</span>
+</div>
+<div class="w-2/12 flex justify-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-2 py-1 rounded">VS</span>
+</div>
+<div class="flex items-center gap-3 w-5/12 justify-end">
+<span class="font-body-lg text-body-lg text-on-surface font-semibold truncate">Almeira</span>
+<img class="w-8 h-8 rounded-full border border-outline-variant" data-alt="A minimalist team crest for 'Almeira' featuring vertical red and white stripes within a modern geometric shield, set against a dark gray circular background, designed for a modern eSports betting interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNWjT8OXfJhUK1iKegkI5bS2plr2DlriOmVx_Y9EWYYVMpivc98Zl1SP7aWQgQrKnK4Lfzy7oKyDjY6bWscHJpjxN6L08Q-JvvnYf-PjSnQRRHkfLEQZTQNCqoKlu-tvXZ7Ijf0yFPhHPPgS7Hx3J_Iwnce1aRYCqnJR6mkyg8mvm9Ch759LK278V79Q2paxNHIJzstUkBq9a28bgzkeY6NFUiWHZWbYQfSyJN4Shk53EgUykroX1AqICxdkSK1LIs9K_bYiQ7SRk"/>
+</div>
+</div>
+<!-- Expanded Markets Area -->
+<div class="bg-surface-container-low rounded-lg p-sm border border-outline-variant/50 mt-2 relative z-10">
+<!-- Market Group: Match Winner -->
+<div class="mb-4">
+<h4 class="font-label-sm text-label-sm text-on-surface-variant mb-2 pl-1 uppercase tracking-wider">Match Winner</h4>
+<div class="grid grid-cols-3 gap-xs">
+<button class="bg-surface border border-outline-variant rounded-md p-2 flex justify-between items-center hover:border-outline transition-colors">
+<span class="font-label-sm text-label-sm text-on-surface-variant">1</span>
+<span class="font-odds-num text-odds-num text-on-surface">2.55</span>
+</button>
+<button class="bg-surface border border-outline-variant rounded-md p-2 flex justify-between items-center hover:border-outline transition-colors">
+<span class="font-label-sm text-label-sm text-on-surface-variant">X</span>
+<span class="font-odds-num text-odds-num text-on-surface">3.10</span>
+</button>
+<button class="bg-surface border border-outline-variant rounded-md p-2 flex justify-between items-center hover:border-outline transition-colors">
+<span class="font-label-sm text-label-sm text-on-surface-variant">2</span>
+<span class="font-odds-num text-odds-num text-on-surface">2.80</span>
+</button>
+</div>
+</div>
+<!-- Market Group: Total Goals -->
+<div>
+<h4 class="font-label-sm text-label-sm text-on-surface-variant mb-2 pl-1 uppercase tracking-wider flex items-center justify-between">
+                            Total Goals
+                            <span class="bg-surface-container-high px-2 py-0.5 rounded text-[10px]">2.5</span>
+</h4>
+<div class="grid grid-cols-2 gap-xs">
+<button class="bg-surface border border-outline-variant rounded-md p-2 flex justify-between items-center hover:border-outline transition-colors group">
+<span class="font-label-sm text-label-sm text-on-surface-variant group-hover:text-on-surface">Over</span>
+<span class="font-odds-num text-odds-num text-on-surface">2.00</span>
+</button>
+<button class="bg-surface border border-outline-variant rounded-md p-2 flex justify-between items-center hover:border-outline transition-colors group">
+<span class="font-label-sm text-label-sm text-on-surface-variant group-hover:text-on-surface">Under</span>
+<span class="font-odds-num text-odds-num text-on-surface">1.75</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Collapse Chevron -->
+<button class="flex items-center justify-center w-full pt-2 text-on-surface-variant hover:text-on-surface transition-colors relative z-10">
+<span class="material-symbols-outlined">expand_less</span>
+</button>
+</article>
+<!-- Standard Match Card (Collapsed) -->
+<article class="bg-surface border border-outline-variant rounded-xl p-md flex flex-col gap-sm hover:border-outline transition-colors shadow-none">
+<!-- Card Header -->
+<div class="flex justify-between items-center text-on-surface-variant font-label-sm text-label-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span>Today 23:00</span>
+<span class="text-outline">|</span>
+<span>Serie A</span>
+</div>
+</div>
+<!-- Teams -->
+<div class="flex justify-between items-center py-2">
+<div class="flex flex-col gap-3 w-full">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<img class="w-6 h-6 rounded-full border border-outline-variant" data-alt="A minimalist team crest for 'Spezia' featuring a stylized black and white eagle on a dark gray circular background, designed for a modern eSports betting interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDde4WH6tal_0MYwDIM87W2OzCkC-AZSuiueraAdAByP04b3LuhvLIJKevggFLNlwcnMaxMCXVneZ1FGMY7L3m6gxPbVtFkNVJ0-ZuPQ6prHqW0Lo-3J1WEaK8PfnQhpNgiVjpQrsMaLoKO-YQZAXnNOxfzng1dni0QfxoNU9M3az-n7HrDyeHYfj03roSs2FmfqhaM5I8fbCmYzxhKuQSQiK_2Wx84Di3JJuwEZhtOvHh0Wgra9dLVXBp_buqQTIcjquFsF9i39xo"/>
+<span class="font-body-lg text-body-lg text-on-surface font-semibold">Spezia</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<img class="w-6 h-6 rounded-full border border-outline-variant" data-alt="A minimalist team crest for 'Chievo' featuring a yellow and blue shield design on a dark gray circular background, designed for a modern eSports betting interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuARNqkxA29ZHVKCM6dw6itLs02Ux9A5u9nbgclmGmsmfvcM4xDwqJJVpu8_o-4JP0WLyX9y7T2kDKHdYNS7Drc32oDGqbWnawagggMyrGIP9GnvppIdPW790uit_I2IQdS5pdnYniuYUCvDLmbhs9lvvIFz4O933KGX70LCJ5ZsBhP9KNJiA7c4hafrk72eAGNlV5PJEMb85e3d1Y9fpS535FOfI0skEWfcXNuFprdYxaPOTT4o1-saHCnHbLJx2s1r9hWN-RpvT4o"/>
+<span class="font-body-lg text-body-lg text-on-surface font-semibold">Chievo</span>
+</div>
+</div>
+</div>
+</div>
+<!-- 1 X 2 Odds Row -->
+<div class="grid grid-cols-3 gap-xs mt-2">
+<button class="bg-surface-container-high border border-outline-variant rounded-lg p-2 flex flex-col items-center justify-center hover:bg-surface-container-highest transition-colors">
+<span class="font-label-sm text-label-sm text-on-surface-variant mb-1">1</span>
+<span class="font-odds-num text-odds-num text-on-surface">1.85</span>
+</button>
+<button class="bg-surface-container-high border border-outline-variant rounded-lg p-2 flex flex-col items-center justify-center hover:bg-surface-container-highest transition-colors">
+<span class="font-label-sm text-label-sm text-on-surface-variant mb-1">X</span>
+<span class="font-odds-num text-odds-num text-on-surface">3.40</span>
+</button>
+<button class="bg-surface-container-high border border-outline-variant rounded-lg p-2 flex flex-col items-center justify-center hover:bg-surface-container-highest transition-colors">
+<span class="font-label-sm text-label-sm text-on-surface-variant mb-1">2</span>
+<span class="font-odds-num text-odds-num text-on-surface">4.20</span>
+</button>
+</div>
+<!-- Expand Chevron -->
+<button class="flex items-center justify-center w-full pt-2 text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined">expand_more</span>
+</button>
+</article>
+</div>
+</main>
+<!-- Sticky Bottom Coupon (Bet Slip Summary) -->
+<div class="fixed bottom-[88px] w-full px-md z-40 max-w-container-max left-1/2 -translate-x-1/2">
+<div class="bg-surface-container-highest/90 backdrop-blur-xl border border-primary-fixed-dim/40 rounded-2xl p-3 flex justify-between items-center shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+<div class="flex flex-col">
+<div class="flex items-center gap-2 mb-1">
+<span class="bg-primary text-on-primary w-5 h-5 rounded-full flex items-center justify-center font-odds-num text-[12px]">3</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Matches Selected</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-on-surface">Total Odds:</span>
+<span class="font-odds-num text-odds-num text-gradient-primary font-bold text-lg">14.50</span>
+</div>
+</div>
+<button class="bg-gradient-to-r from-primary-fixed-dim to-primary text-on-primary font-label-sm text-label-sm font-bold px-6 py-3 rounded-xl flex items-center gap-2 shadow-[0_0_15px_rgba(0,221,214,0.3)] hover:scale-95 transition-transform active:scale-90">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+                View Coupon
+            </button>
+</div>
+</div>
+<!-- BottomNavBar -->
+<nav class="bg-surface-container border-t border-outline-variant shadow-lg dark:shadow-none fixed bottom-0 w-full z-50 flex justify-around items-center px-xs pb-safe h-20 rounded-t-xl max-w-container-max mx-auto left-0 right-0">
+<!-- Active: Home -->
+<button class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-4 py-1 scale-90 transition-transform cursor-pointer">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-sm text-label-sm mt-1">Home</span>
+</button>
+<!-- Inactive: Leagues -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">emoji_events</span>
+<span class="font-label-sm text-label-sm mt-1">Leagues</span>
+</button>
+<!-- Inactive: My Bets -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:text-primary transition-colors cursor-pointer relative">
+<!-- Badge -->
+<span class="absolute top-0 right-2 w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-label-sm text-label-sm mt-1">My Bets</span>
+</button>
+<!-- Inactive: Live -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">sensors</span>
+<span class="font-label-sm text-label-sm mt-1">Live</span>
+</button>
+<!-- Inactive: Menu -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">menu</span>
+<span class="font-label-sm text-label-sm mt-1">Menu</span>
+</button>
+</nav>
+</body></html>

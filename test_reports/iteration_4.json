@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only re-test of the HIGH-priority iteration_3 regression (page horizontal overflow at 390px on admin dashboard with completed 8-team cup connector-tree). All 4 review-request acceptance criteria PASS after the `min-w-0` fix on (a) Dashboard lg:col-span-2 wrapper, (b) [data-testid=cup-bracket] root, and (c) inner .glass card around BracketTree. The Radix `DialogTitle` console error is also resolved (sr-only DialogTitle added).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "CupSummaryModal", "issues": ["Two Radix `Missing Description or aria-describedby` console warnings still emitted when modal opens. Lower-priority a11y debt — original DialogTitle error is fixed but DialogDescription (or aria-describedby={undefined}) is still missing. Add a <DialogDescription> or VisuallyHidden description."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(LOW / a11y) Add <DialogDescription> (or sr-only via VisuallyHidden) to CupSummaryModal — two Radix warnings remain about missing Description/aria-describedby. Same pattern likely affects other Dialogs."
+  ],
+  "critical_code_review_comments": [
+    "Fix is correct and minimal: `min-w-0` on the grid item + on `.glass` wrapper inside CupBracket properly lets `overflow-x-auto` on data-testid=cup-tree clip the intrinsic bracket width. Reproduced expectations exactly: 390px viewport -> document.documentElement.scrollWidth=390 (was 638), cup-tree.scrollWidth=596 vs clientWidth=332 (scrolls inside container), cup-champion-banner width=358 (was 622). Only element still wider than viewport is the *inner* `div.flex.min-w-min` (596px) which is correctly inside the scrollable cup-tree — expected and desired.",
+    "Radix `DialogTitle` accessibility error from iteration_3 is no longer raised (sr-only DialogTitle works). However two `DialogDescription`/`aria-describedby` warnings now appear — same a11y category, lower priority."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100% (4/4 review items)"},
+  "test_credentials": "Admin neco/neco404 confirmed working. Completed cup 'Neon Kupası' (champion Sahinler/SAH) preserved as instructed.",
+  "seed_data_creation": "None. Existing seed data used.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "PASS — 390x844 admin dashboard: docScrollWidth=390 == docClientWidth=390 (was 638). cup-bracket width=358, cup-champion-banner width=358 (both <=390). cup-tree scrolls internally: scrollWidth=596 vs clientWidth=332. The only over-wide element is `div.flex.min-w-min` (596px) which is correctly *inside* the cup-tree scroller. PASS — 1440x900: docScrollWidth=1440 == docClientWidth=1440. Tree renders 3 columns ('Çeyrek Final', 'Yarı Final', 'Final') with ~80 connector/decoration spans; cup-tree width=705px. PASS — Summary modal: open-cup-summary-btn opens cup-summary-modal at 390px, abbreviations not clipped, Radix DialogTitle error gone. NOTE: two `Missing Description or aria-describedby` Radix warnings now appear — lower-priority a11y. Cup preserved (NOT deleted).",
+  "rca of the issue": "Previously: CSS-grid `lg:col-span-2` and inner `.glass` card defaulted to min-width:auto, expanding to intrinsic bracket width (~596px) and dragging the page to 638px wide at 390px viewport. Fix: Tailwind `min-w-0` on Dashboard column + cup-bracket root + .glass card forces the grid/flex item to honour its container width, letting the inner `overflow-x-auto` on data-testid=cup-tree clip horizontally. Verified: at 390px viewport, doc width = 390, banner = 358, tree internal scrollWidth 596 > clientWidth 332 (scrolls inside as intended)."
+}
