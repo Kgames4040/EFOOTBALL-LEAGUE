@@ -1,6 +1,6 @@
 import api from "./api";
 
-export const COIN_ICON_URL = "https://customer-assets.emergentagent.com/job_be1f8c82-f3f9-45d4-90ca-fe2de53a3e08/artifacts/gq9w7dei_lig%20bahis%20pin.png";
+export const COIN_ICON_URL = "https://i.ibb.co/JjbycYyb/Gemini-Generated-mage-ypuyveypuyveypuy-photoaidcom-cropped.png";
 
 export const BET_TYPE_LABEL = {
   MS: "Maç Sonucu",
